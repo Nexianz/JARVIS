@@ -217,6 +217,10 @@ class QuotaGateway:
                         responses.append(response)
                     data=json.dumps(responses if batch else responses[0]).encode();self.send_response(200)
                     self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+                except (ConnectionAbortedError,ConnectionResetError,BrokenPipeError):
+                    # Anvil may close a local request before reading its reply.
+                    # The upstream reservation/cache is already retained: never retry here.
+                    return
                 except (ValueError,TypeError,KeyError):self.send_error(400)
         self.server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True);self.thread.start()
