@@ -10,7 +10,7 @@
 |DNS her|Oppslag mot Alchemy og npm-registry feilet|Kan ikke hente verktøy eller måle mainnet her|
 |Foundry/Anvil/Solidity|Ikke installert i miljøet|Solidity-kompilering og EVM-integrasjon er IKKE kjørt/verifisert|
 |Python|3.12 i leveransemiljøet; syntakskontroll bestått|Dette alene beviser ikke at backtesten virker mot en ekte node|
-|Lokale enhetstester|35 tester kjørt, 35 bestått|Syntetiske fixtures for ABI, kostnader, sizing, konkurranseproxy, risikokontroll og datasperrer; ingen avkastningsobservasjoner|
+|Lokale enhetstester|39 tester kjørt, 39 bestått|Syntetiske fixtures for ABI, kostnader, sizing, konkurranseproxy, risikokontroll og datasperrer; ingen avkastningsobservasjoner|
 |Historisk 30/90-dagers innsamling|IKKE kjørt|Ingen MÅLTE historiske mulighetstall eller avkastningstall|
 |Monte Carlo / walk-forward på reelle data|IKKE kjørt|Implementert, men ingen resultater er påstått|
 |Resultatgrafer og PnL-rapport|IKKE produsert|Ingen fabrikerte kurver, skjulte eksempel-fills eller demo-resultater|

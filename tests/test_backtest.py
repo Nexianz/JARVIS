@@ -143,4 +143,26 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaises(RPCError) as e:r.call('eth_chainId',[])
         self.assertIn('HTTP 403',str(e.exception));self.assertNotIn('SECRET',str(e.exception))
 
+class FullURLSetupTests(unittest.TestCase):
+    def test_full_url_is_saved_without_separate_key(self):
+        from rpc_setup import write_config
+        with tempfile.TemporaryDirectory() as d:
+            p=pathlib.Path(d)/'.env';write_config(p,'https://eth-mainnet.g.alchemy.com/v2/synthetic_key')
+            self.assertEqual(p.read_text().splitlines()[-1],'ETH_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/synthetic_key')
+    def test_full_url_cannot_overwrite_existing_env(self):
+        from rpc_setup import write_config
+        with tempfile.TemporaryDirectory() as d:
+            p=pathlib.Path(d)/'.env';p.write_text('preserved')
+            with self.assertRaises(RuntimeError):write_config(p,'https://example.invalid/rpc')
+            self.assertEqual(p.read_text(),'preserved')
+    def test_wizard_full_url_needs_only_one_hidden_input(self):
+        import rpc_setup,io
+        url='https://eth-mainnet.g.alchemy.com/v2/synthetic_secret'
+        with unittest.mock.patch('sys.argv',['rpc_setup.py']),unittest.mock.patch('pathlib.Path.exists',return_value=False),unittest.mock.patch('getpass.getpass',return_value=url) as prompt,unittest.mock.patch('rpc_setup.write_config') as save,unittest.mock.patch('sys.stdout',new_callable=io.StringIO) as output:
+            rpc_setup.main();self.assertEqual(prompt.call_count,1);save.assert_called_once_with('.env',url);self.assertNotIn('synthetic_secret',output.getvalue())
+    def test_wizard_default_requests_separate_key(self):
+        import rpc_setup,io
+        with unittest.mock.patch('sys.argv',['rpc_setup.py']),unittest.mock.patch('pathlib.Path.exists',return_value=False),unittest.mock.patch('getpass.getpass',side_effect=['','synthetic_key']) as prompt,unittest.mock.patch('rpc_setup.write_config') as save,unittest.mock.patch('sys.stdout',new_callable=io.StringIO):
+            rpc_setup.main();self.assertEqual(prompt.call_count,2);save.assert_called_once_with('.env',DEFAULT_ALCHEMY_ENDPOINT,'synthetic_key')
+
 if __name__=='__main__':unittest.main()

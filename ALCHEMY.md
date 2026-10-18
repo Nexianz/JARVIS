@@ -12,7 +12,7 @@ cd JARVIS
 python rpc_setup.py
 ```
 
-Trykk Enter for standard Ethereum mainnet-endpoint. Skriv så **ny API-nøkkel** når programmet spør; teksten skjules. Programmet oppretter `.env` og overskriver aldri en eksisterende fil.
+Du kan lime inn en **komplett HTTPS-RPC-URL** i første spørsmål; da spør programmet ikke om en ekstra nøkkel. Eller trykk Enter for standard Ethereum mainnet-endpoint og skriv så **ny API-nøkkel** når programmet spør. Begge inntastinger er skjult, også URL-en, fordi den kan inneholde nøkkelen. Programmet oppretter `.env` og overskriver aldri en eksisterende fil.
 
 Test tilgangen uten Foundry, wallet eller transaksjoner:
 
