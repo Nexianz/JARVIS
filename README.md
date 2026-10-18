@@ -1,115 +1,109 @@
-# Historisk ETH-arbitrasje: forskningspakke, ikke handelsbot
+# JARVIS — ekte marked, fiktive penger
 
-**Start her for API-nøkkel og endpoint: [ALCHEMY.md](ALCHEMY.md).** `python rpc_setup.py` lager lokal `.env` med skjult nøkkelinntasting; `python rpc_setup.py --check` tester lesetilgang uten Foundry.
+Netlify-hostet nettside som følger USDC/WETH på Ethereum mainnet og viser en agents beslutninger og paperhandler. Startkapitalen er **ANTATT 5000 NOK**. Ingen wallet, privatnøkler eller ekte handler. **Ingen Ubuntu, Python eller Foundry er nødvendig for nettsiden.**
 
-**Status: Ingen historisk avkastning er målt i leveransemiljøet.** Alchemy ga transportfeil; DNS-oppslag feilet, også etter separat tilgangsforsøk. Foundry/Anvil og Solidity-kompilatoren er ikke installert der. Python-koden er syntakskontrollert og enhetstestet med uttrykkelig syntetiske test-fixtures. Solidity-kompilering, arkivinnsamling og EVM-integrasjon må derfor verifiseres på din maskin med stegene nedenfor. Dette er ikke en påstand om ferdig verifisert backtest eller at alle krav er empirisk oppfylt.
+Agenten sjekker Uniswap V2, SushiSwap V2 og Uniswap V3 0,05/0,30 %. Netlify Functions holder nøkler på serveren; Netlify Blobs beholder porteføljen mellom besøk og deployer. En planlagt funksjon skanner omtrent hvert minutt når agenten er startet. Det går også uten at nettleseren er åpen.
 
-**Konklusjonen nå er ukjent**, ikke overskudd, tap eller null. Ingen eksempelkurver eller fabrikkert resultatfil følger med. Rapportgeneratoren nekter å rapportere en ufullstendig innsamling eller en kort smoke-test som et historisk resultat.
+## Få den på Netlify
 
-## Hva som erstatter de gamle ZIP-filene
+1. Åpne Netlify → **Add new project / Import an existing project** → GitHub → velg **Nexianz/JARVIS**, branch **main**.
+2. Behold prosjektroten som base directory. `netlify.toml` angir automatisk:
+   - Build command: `npm run build`
+   - Publish directory: `web`
+   - Functions directory: `netlify/functions`
+   - Node: 22
+3. I prosjektets **Environment variables**, legg inn følgende som hemmelige verdier med tilgang for **Functions** i **Production**:
 
-Den gamle koden sammenlignet samtidige quotes og trakk fra modellerte kostnader. Papirporteføljen var ikke dokumentasjon på hva en liten searcher kunne tjent. Denne pakken har ingen nettside og bygger ikke videre på de fiktive paper-fills.
+|Navn|Hva du legger inn|
+|---|---|
+|`ALCHEMY_API_KEY`|Din **nye** Alchemy Ethereum Mainnet API-nøkkel|
+|`PAPER_ADMIN_TOKEN`|Et selvvalgt, langt og tilfeldig eierpassord, minst 16 tegn. Dette er **ikke** Alchemy-nøkkelen.|
 
-Den bruker Ethereum mainnet USDC/WETH på Uniswap V2, SushiSwap V2, Uniswap V3 500 og Uniswap V3 3000, begge ruteretninger mellom ulike pooler. Basistoken for lån og egenkapitalhandel er USDC. Dette dekker markedene i vedleggene, ikke alle mulige Ethereum-arbitrasjer.
+Alternativ til `ALCHEMY_API_KEY`: sett `ETH_RPC_URL` til hele HTTPS-URL-en fra Alchemy. Den overstyrer separat nøkkel. Standard `ALCHEMY_ENDPOINT` er `https://eth-mainnet.g.alchemy.com/v2/{API_KEY}`; normalt trenger du ikke sette den. **Ingen nøkkel i Git, HTML eller frontend-kode. Ikke bruk et `VITE_`-/offentlig frontend-prefiks.**
 
-Følgende ord har konsekvent betydning:
+4. Deploy prosjektet. Hvis variablene ble lagt inn etter første deploy, kjør en ny deploy.
+5. Åpne nettsiden. Trykk **Eiertilgang**, skriv **eierpassordet**, og trykk **Start agent**. Trykk **Skann nå** for første måling. Deretter går planlagte skanninger automatisk på produksjonsdeployen.
+6. Trykk **Pause agent** når du vil stoppe. Planlagte kall hopper da over markedslesing. Kanal kan endres mellom privat bundle og offentlig mempool mens agenten er pauset.
 
-- **MÅLT**: blokkhoder, arkiverte `eth_call`-svar, Chainlink-observasjoner, `eth_feeHistory` og swap-events fra mainnet. Historisk USD/NOK er også MÅLT, men fra Norges Bank, ikke fra kjeden.
-- **BEREGNET**: priser/size-søk, lokalt simulerte EVM-profitter og gass, konkurranseindikatorer, porteføljekurver, drawdown, sensitiviteter, walk-forward og Monte Carlo. De siste utfallene er betinget på antakelser.
-- **ANTATT**: startkapital, posisjonsgrenser, bud, inklusjon, usikkerhetsfradrag, feilrate, etableringskostnad og risikogrenser. Et scenario kalt «realistisk» er en ukalibrert arbeidshypotese, ikke en empirisk målt sannsynlighet.
+Bruk Git-import, **ikke** Netlify Drop med bare HTML-mappen: siden trenger serverfunksjoner, planlagte funksjoner og varig lagring. Planlagte kjøringer virker på den publiserte produksjonssiden, ikke som en garanti i deploy-preview. Kontroller at Netlify-planen tillater Functions, Scheduled Functions og Blobs, og se `pulse` i Functions-visningen for kjørestatus. Netlify tilfører Blobs-tilgang automatisk i sine funksjoner; ingen egen database- eller wallet-nøkkel er nødvendig.
 
-Alle rapporttabeller merkes med status. `results.json` har kildekart. Rå observasjoner i SQLite/JSON beholder feltnavn for maskinlesing; deres kildeklassifisering er beskrevet her og i rapporten.
+Netlify- og Alchemy-kreditter kan brukes selv om pengene i porteføljen er fiktive. En skanning gjør omtrent 55 lesekall, flere hvis en pending-rute må sjekkes for konkurranse. Både Netlify-kvoter og Alchemy-rate limits kan begrense frekvensen. Ingen kontinuerlig blokk-for-blokk-bot påstås.
 
-## Hva som måles, og hva som ikke kan fastslås
+## Vil du at en faktisk språkmodell skal velge?
 
-For hver sammenhengende blokk **b** leses handelsinformasjon ved slutten av **b−1**. Ruter screenes med reelle historiske reserver/V3-priser og fee tiers. V2 bruker den eksakte heltallsformelen med protokollens faste 0,30 % swapgebyr. V3 QuoterV2 utfører faktisk tick-/likviditetslogikk via `eth_call` på eksplisitt blokknummer. V3 har konsentrert likviditet, ikke V2-lignende reserver. Historisk V3 `slot0`, aktiv likviditet og tokenbalanser beholdes; selve quote-/fork-kjøringen leser også ticks fra arkivnoden.
+Uten OpenAI-nøkkel viser nettsiden **Regelbasert agent**. Den velger høyest beregnet netto blant ruter som passerer risikogrenser. Dette skal ikke fremstilles som at en språkmodell har tatt beslutningen.
 
-Hele transaksjonen kjøres på en lokal Anvil-fork fra b−1: flash loan når valgt, USDC→WETH, WETH→USDC, Aave-tilbakebetaling, `minProfit` og en ikke-null coinbase-betaling. Aaves premium hentes historisk, og den faktiske Aave-koden bestemmer tilbakebetalingen i simuleringen. Gass kommer fra lokale transaksjonskvitteringer, ikke et fast 500 000-estimat. En bevisst sen `minProfit`-revert må nå siste guard; en annen feiltype stopper innsamlingen. De simulerte gasstallene er **BEREGNET**, ikke historisk gass faktisk brukt av en egen transaksjon.
+For faktiske AI-beslutninger legger du til følgende servervariabel i Netlify og redeployer:
 
-Vi kjenner neste blokks base fee fra b−1s gasUsed/baseFee/gasLimit. Den kontrolleres mot b. «Faktisk priority fee per blokk» er ikke ett tall: hver transaksjon har sin egen effektive tip. Vi lagrer gas-vektet median fra hver blokk via `eth_feeHistory`, med reservevei via fullstendig kontrollerte historiske kvitteringer (`effectiveGasPrice − baseFeePerGas`) dersom metoden feiler. Kilden lagres per blokk. Vårt **ANTATTE** gasstilbud bruker bare b−1s målte median. b sin median brukes utelukkende som diagnostikk, aldri til å velge handler. Det er ingen påstand om at et slikt bud ville blitt inkludert.
+|Navn|Verdi|
+|---|---|
+|`OPENAI_API_KEY`|Din egen OpenAI API-nøkkel, kun Functions-scope|
+|`OPENAI_MODEL`|Valgfritt; standard `gpt-4.1-mini`|
 
-Neste blokks tidsstempel antas til forrige +12 sekunder; coinbase antas lik forrige blokks. Faktisk fremtidig coinbase og tidsstempel får ikke påvirke pretrade-valget. Denne antatte konteksten brukes i lokal EVM, som kjører Prague-regler. Derfor er det støttede historiske vinduet avgrenset til **2025-05-08 til 2025-12-02, slutt eksklusiv**. Standardeksemplet er **2025-06-01 til 2025-08-30**, 90 kalenderdager. Dette er ikke en tilbakeprøving av dagens siste 90 dager. Andre hardfork-epoker må implementeres og kontrolleres før denne sperren utvides.
+Da viser nettsiden **AI + faste risikogrenser**. Modellen kan velge en av de kvalifiserte rutene eller vente. Den får bare markedsmålinger og kostnadsanslag, ingen hemmeligheter. Ugyldig svar eller AI-feil betyr vent, ikke automatisk regelhandel. Modellen kan ikke øke beløp eller omgå risikokrav. OpenAI API kan koste penger; denne integrasjonen er testet med en simulert API-respons, ikke en ekte OpenAI-konto i leveransemiljøet.
 
-Når en rute og størrelse er valgt uten neste-blokkdata, undersøkes swap-events i b. En transaksjon med begge ruteleggene og riktige retninger behandles konservativt som «tatt av andre». Dette er en **BEREGNET proxy**, ikke en full identifikasjon av lønnsom arbitrørhandel: router-handler kan gi falske treff, og flere separate transaksjoner kan overses. Private tapende bundles og alle builder-bud er ikke offentlig observerbare. Verktøyet kan derfor ikke oppfylle en bokstavelig garanti om å finne hver arbitrør eller bevise hvilke konkurranser vi faktisk ville vunnet.
+## Hva nettsiden faktisk viser
 
-Ruten velges før konkurransedata leses inn i utfallsmodellen. Vi velger ikke den ruten som vi i ettertid vet ble stående. En vunnet simulert handel får ikke høste samme uendrede pooltilstand på nytt; minst én brukt pool sperres inntil historikken viser en ny tilstand for den. Dette er en beskyttelse mot gjentatt fantomprofitt, men **ikke** en komplett omskriving av senere historiske blokker etter våre kontrafaktiske handler.
+- **MÅLT:** observert mainnet-blokk, ETH/USD og USDC/USD fra Chainlink, pool-quotes og Aave-premium på samme eksplisitte blokknummer. Ruter bruker USDC → WETH → USDC i ulike pooler. Swapgebyr og prisimpact er inkludert i DEX-quotes.
+- **BEREGNET:** prisforskjeller, forventet netto og NOK-regnskap for virtuelle handler.
+- **ANTATT:** startkapital, gassmengde, gasstilbud for neste forsøk, builder-bud, inklusjon og simulerte fills/reverteringer. En paper-fill er ikke en EVM-verifisert transaksjon eller bevist gjennomførbar arbitrase.
 
-Vi spiller ikke om alle andre transaksjoner inni b og rekonstruerer ikke privat ordreflyt eller et builder-auksjonsmarked. Rekkefølgeendringer, ugunstig prisendring og ikke-observert konkurranse modelleres eksplisitt med **ANTATTE** haircut-, feil- og inklusjonsparametere. En eksakt fasit på «hva som faktisk ville skjedd» finnes ikke i offentlig kjedehistorikk alene. Resultatet må leses som en betinget kontrafaktisk backtest, ikke realisert PnL.
+USD/NOK er en målt ECB-dagskurs fra Frankfurter når tilgjengelig. Ved feil brukes en eksplisitt **ANTATT** kurs på 10,5, synlig i et varsel og i hver paperhandel. Beholdningen er en forenklet virtuell NOK-kontantbeholdning, ikke en virkelig ETH/USDC-wallet med kursrisiko. Den virtuelle flash-loan-hovedstolen er ikke porteføljens egenkapital.
 
-## Størrelse, kapital og kostnader
+Ingen demopriser eller eksempelgevinster fyller dashboardet. Før første vellykkede markedsskanning vises tomme felt og den tydelig fiktive startkapitalen. Ingen trades er et legitimt utfall.
 
-Per rute søkes først et logaritmisk størrelsesgitter og deretter en lokal numerisk forbedring. Både gitterstørrelsene og den forbedrede størrelsen EVM-simuleres, slik at analysen kan velge etter gass, bud og nettoprofitt, ikke bare bruttospread. Prisimpact inngår i hvert quote og i hele swapsekvensen. Det er et numerisk søk, ikke et bevis på globalt optimum i en vilkårlig tick-struktur.
+### Beslutning og utførelse
 
-Hver rute begrenses til 10 % av målte USDC-balansene i begge poolene. Flash loan begrenses også til 90 % av tilgjengelig USDC i Aaves aToken, og en eksplisitt maksimal søkegrense på 10 millioner USDC. `at_search_cap` viser når løsningen nærmer seg en grense. En grensebundet løsning skal ikke kalles globalt optimal.
+1. Les ny blokk og quotes for 1000 / 10 000 / 50 000 USDC. Dette er et størrelsesgitter, ikke et globalt størrelsesoptimum.
+2. Trekk faktisk lest Aave-premium, antatt gass, builder-bud og utførelsesbuffer fra bruttoquote.
+3. Filtrer ruter mot risiko. Regelagent eller AI velger et signal, som **ikke** straks bokføres som gevinst.
+4. På neste måling prises **samme rute og beløp** på nytt. Vi bytter ikke til den ruten som først i ettertid ser best ut. Signaler eldre enn tre minutter droppes.
+5. Les swap-events mellom målingene. Begge rutelegg i samme transaksjon behandles konservativt som tapt konkurranse. Dette er en proxy: aggregator-kundehandler kan gi falske treff, og separate arbitrørtransaksjoner kan overses. Ukjente data betyr ingen fill.
+6. Hvis ruten fortsatt passerer kontrollene, brukes en **ANTATT capture-sjanse på 10 %**. Utfallet trekkes reproduserbart fra en hash av signalblokk/rute, ikke fra faktisk builder-inkludering. Privat ikke-inkludering koster null; offentlig modell har i tillegg 20 % antatt revertsjanse gitt capture. Et kollisjonstreff kan gi offentlig, modellert revert. Forsøk som allerede har falt under risikokrav avvises før modellert innsending; dette rekonstruerer ikke en tidligere sendt mempooltransaksjon.
+7. Bare dette **SIMULERTE** utfallet bokføres, med kostnader og kildemerking.
 
-- **A, flash loan:** ANTATT 5000 NOK konverteres til ETH for gass og builder-bud. Hovedstolen lånes og returneres atomisk. Profitt beholdes i USDC. Ingen hovedstol trekkes fra egenkapitalen.
-- **B, egenkapital:** ANTATT 20 % av 5000 NOK settes av i ETH til gass, 80 % i USDC. Størrelser søkes innen 25/50/75/100 % av den opprinnelige USDC-rammen. Beste simulerte, tilgjengelige størrelse velges per anledning. Ingen lån. Lavere løpende saldo kan gi underutnyttelse mellom størrelsesrammene; høyere saldo øker ikke opprinnelig hovedstolsramme automatisk.
+Dette bekrefter på neste **måling**, ofte flere blokker senere. Det er ikke neste-blokk-execution, replay av full transaksjon, faktisk privat ordreflyt eller en historisk backtest. Skatter, abonnement, maskinvare og revisjon er ikke trukket fra paper-PnL. En positiv kurve beviser ikke at strategien ville tjent penger i virkeligheten.
 
-Startkonvertering koster ANTATT 0,30 %. Gassbeholdningen etterfylles ikke automatisk; hvis den blir for lav, stoppes handler, også om det finnes USDC-gevinster. Dette er en bevisst, sporbar driftsregel, ikke en påstand om optimal treasury-styring. Resultatet sammenlignes med en passiv beholdning med samme fordeling og etableringskostnad. En separat handels-PnL vises ved handelsdagens FX. Dermed blir en ETH-kursoppgang ikke forvekslet med arbitrasjeprofitt.
+### Faste sperrer og synlige antakelser
 
-Builder-bud er ANTATT 80/90/95/99 % av overskuddet etter flash-premium og basisgass. Ingen historisk builder-betaling for vår ikke-eksisterende transaksjon hevdes målt. Lokalforken måler gasstien for en liten ikke-null coinbase-betaling; den økonomiske modellen belaster det antatte ETH-beløpet. Gasstall får en ANTATT buffer på 512 gas for blant annet ulik calldata i minProfit. Sikkerhetsmarginen er et krav til gjenværende overskudd, ikke en fiktiv utgift.
+|Innstilling|ANTATT verdi|
+|---|---:|
+|Startkapital|5000 NOK|
+|Gas ved fill / revert|450 000 / 200 000 enheter|
+|Gasstilbud|observert base fee × 1,125 + observert median-tip; RPC-anbefalt tip merkes ANTATT dersom feeHistory feiler|
+|Builder-bud|90 % av overskudd etter gass og premium|
+|Utførelsesbuffer|3 bp av hovedstolen; konservativt prisfradrag, ikke påstått faktisk gebyr|
+|Minimum netto|2 NOK + 25 % av gasskostnaden som margin|
+|Maks daglig / ukentlig tap|50 / 150 NOK, UTC|
+|Maks gasskostnad / gasstilbud|30 NOK / 100 gwei|
+|Maks feil siste time|3|
+|Tokens|Kun kanoniske USDC og WETH|
 
-Offentlig mempool: inkluderte kollisjoner antas å revertere og betale lokalt målt sen-revert-gass. Andre feil kan koste mer eller mindre. Private bundles: ikke-inkludering koster null; når modellen antar inklusjon kan en annen state-/utførelsesfeil fortsatt gi revert. Dette er konservativt for bundles som faktisk har vellykket buildersimulering. Ingen betaling ved mislykket coinbase-/minProfit-transaksjon, ettersom hele EVM-transaksjonen reverterer.
+Det finnes ingen produksjonshandelskontrakt her. Ingen minProfit-garanti på mainnet, ingen wallet-tilkobling og ingen transaksjonssignering. Hvis man en gang vurderer ekte penger, kreves en separat produksjonsimplementasjon og uavhengig revisjon; paperresultater er ikke tilstrekkelig. Den tidligere forskningsharnessen er urevidert og sperret til lokal kjede-ID 31337.
 
-RPC-abonnement, skatter, VPS, revisjon og øvrige driftskostnader er ikke inkludert. De kan ikke forbedre resultatet. USDC/USD måles historisk via Chainlink; 1 USDC antas ikke alltid lik 1 USD. Norges Banks kurs for siste tilgjengelige dag brukes i helger, maksimalt fem dagers foreldelse. Ingen fremtidig FX fylles bakover.
+## Lokal visning på Windows — valgfritt, uten Ubuntu
 
-## Risikogrenser implementert i koden
+Installer Node.js 22 LTS og Git. I PowerShell:
 
-Se `model.py` og `contracts/Replay.sol`.
+```powershell
+git clone https://github.com/Nexianz/JARVIS.git
+cd JARVIS
+npm ci
+Copy-Item .env.example .env
+notepad .env
+npm run dev
+```
 
-|Regel|Standard, alle ANTATT|Håndheving|
-|---|---:|---|
-|Minste netto|1 NOK + 25 % av gasskostnaden i sikkerhetsmargin|Filter etter premium, gass og builder-bud; minProfit-budsjett i USDC|
-|Maks dagstap|50 NOK|Neste forsøk nektes hvis full antatt reverteringskostnad kan bryte grensen|
-|Maks ukestap|150 NOK|ISO-uke, UTC; overlever døgnskifte|
-|Maks gasskostnad per forsøk|30 NOK|Prospektiv kontroll|
-|Maks gasstilbud|100 gwei|Prospektiv kontroll; ikke universell fast gasspris|
-|Maks inkluderte feil siste time|3|Rullerende 3600 sekunder, pause til utløp|
-|Tokenfilter|Kun kanoniske USDC og WETH|Andre tokens, inkludert ukjente fee-on-transfer/honeypots, er ikke kvalifisert|
-|Poolfilter|Minst 30 dager gammel; minst 1 million USD USDC-side|Historisk bytecode, kanonisk factory, token0/1, V3 fee og historiske balanser|
-|Kontraktsvern|minProfit og verifisert flash-callback|Revert dersom sluttbalansen ikke dekker hovedstol + avtalt tokenprofitt; gas/bid-budgett oversettes til minProfit av modellen|
+Hvis `.env` allerede finnes, åpne den; ikke overskriv den. Legg inn ny Alchemy-nøkkel/hel URL og et eget `PAPER_ADMIN_TOKEN`. Åpne nettleseren på port 3000 på din maskin. Lokal portefølje lagres i ignorert `.local/paper.json`; denne filen lastes ikke til Netlify. Netlify bruker Blobs og krever ikke at din maskin står på.
 
-Dag-/uketap summerer negative handelsutfall, ikke urealiserte kursbevegelser. Gevinster nullstiller ikke tapstelleren. Gass-taket gjelder inkludert antatt gasbuffer. Privat ikke-inkludering regnes ikke som inkludert feil. En kill switch mot kursrisiko i passiv ETH-beholdning er ikke implementert; den er synlig separat i egenkapital og hold-referanse.
+## Kontrollert i leveransemiljøet
 
-USDC kan fryses eller oppgraderes; en allowlist eliminerer ikke dette. Kodens filter er et restriktivt univers, ikke en generell honeypot-detektor. Swap-/repayment-feil stanser eller forkaster den aktuelle EVM-simuleringen; de skjules ikke som passerte tester.
+- `npm test`: 24 tester for beslutninger, kostnader, risiko, API-autentisering, konkurranse, samtidighet og ekte SDK mot lokal Netlify Blobs-emulator. Marked/AI-responser i testene er eksplisitt syntetiske.
+- `npm run build`: publiseringsmappen sjekkes; kun statiske nettsidefiler publiseres.
+- Nettleser: desktop, mobil, eierdialog, ingen JavaScript-feil og kontroll av horisontal overflow.
+- Ingen ny Alchemy-/OpenAI-nøkkel er tilgjengelig i leveransemiljøet. Reelle Netlify Functions, planlagt cron, ekte Alchemy-quotes og OpenAI er **ikke verifisert i en publisert Netlify-instans**. Din tidligere Windows-test viste at Alchemy-arkivtilgangen fungerer, men det er en separat test.
+- 49 eksisterende Python-tester bevares for den tidligere forskningspakken. De er ikke nødvendige for nettsiden.
 
-## Scenarioer, sensitivitet, walk-forward og Monte Carlo
+## Tidligere historisk forskningspakke
 
-Alle tall i neste tabell er **ANTATT**, ikke estimert fra egne faktiske handler:
-
-|Navn|Privat inklusjon etter ikke-påvist kollisjon|Offentlig inklusjon|Ekstra feilrate gitt inklusjon|Maks ugunstig profittfradrag|Builder-andel|
-|---|---:|---:|---:|---:|---:|
-|Pessimistisk|1 %|95 %|25 %|25 %|99 %|
-|Realistisk, ukalibrert|10 %|95 %|10 %|10 %|95 %|
-|Optimistisk|50 %|95 %|2 %|2 %|80 %|
-
-For hver inkludert transaksjon trekkes adverse haircut uniformt mellom null og scenarioets maksimum. Hvis beholdt tokenprofitt ikke møter kontraktens minProfit-budgett, modelleres revert selv uten en ekstra tilfeldig feil. Builder-budet blir ikke magisk redusert etter at den ugunstige prisendringen er kjent.
-
-Bud-sensitiviteten holder inklusjonsantakelsen konstant mens kostnadsandelen varieres. Den måler kostnadseffekten, ikke en kalibrert bud/inkluderingskurve; en slik kurve krever faktiske egne bundles eller tilsvarende data som ikke finnes her.
-
-Walk-forward bruker første tredel av kalenderdagene til å velge bare én parameter: minimumsnetto 1, 2 eller 5 NOK. Samme risikogrenser og priorer beholdes. Scoren er gjennomsnitt av åtte faste modellfrø i treningsperioden, deretter fryses terskelen før siste to tredeler testes. Holdout starter med ny ANTATT 5000 NOK. Dette er modellkalibrering, ikke empirisk estimering av en searchers suksessrate. Hvis trening har null handler, er det ingen datastøttet finjustering; lik-score velger høyeste terskel.
-
-Monte Carlo kjører minst 1000 trekk **per modus og kanal på holdout**, med faste frø og parametere trukket per hel kjøring: privat inklusjon 1–50 %, offentlig 80–100 %, ekstra feil 2–25 %, maks haircut 2–25 %, builder-andel 80–99 %. Disse uavhengige uniformpriorene er ANTATTE, og virkelige korrelasjoner er ukjente. Rapporten viser derfor betingede fordelinger, ikke en objektiv sannsynlighet for å tjene penger. MC bruker hendelsesblokker og dagsslutt for hastighet; sluttsaldo er bevart, og MC påstår ikke å måle intradag-drawdown fra den komprimerte serien. Hovedscenarioenes drawdown beregnes på hele blokkserien.
-
-## Smartkontraktrisiko, nøkkelhåndtering og ekte penger
-
-`Replay.sol` er en **urevidert forskningsharness**. Den installeres med `anvil_setCode` på en engangsfork, ikke med en mainnet-deploy. Den har en hard sperre på chain ID 31337. Python tillater bare lesemetoder til arkiv-RPC. Lokale skriveoperasjoner må treffe en ny Anvil som programmet selv startet på 127.0.0.1 og som bekrefter riktig klient og chain ID. Ingen brukerprivatnøkkel, wallet-tilkobling eller mainnet-broadcast finnes i arbeidsflyten. De lokale impersonerte adressene er fiktive, ikke dine wallets.
-
-`minProfit` gjør ikke et system sikkert alene: godkjennelser, callback-autentisering, reentrancy, revert-data, ruter-/pooladresser, tokenoppgraderinger, rounding, kjedespesifikk EVM, builder-betaling og USDC/Aave-infrastruktur må gjennomgås. Harnessen er ikke en sikker produksjonskontrakt; blant annet mangler den produksjonsmessig tilgangskontroll og uttaksdesign. Den skal ikke få reelle midler.
-
-Før noen separat produksjonsvurdering må et uavhengig revisjonsteam revidere en egen produksjonsimplementasjon, kontrollere compiler/dependency-proveniens, skrive fuzz-/invariant- og adversarielle fork-tester, verifisere worst-case minProfit/gas/bid, callbacks og godkjennelser, dokumentere nødprosedyrer og kontrollere distribusjonsbytecode. En backtest eller disse enhetstestene erstatter ikke revisjon. Eventuelle fremtidige nøkler må forvaltes separat i maskinvare-/MPC-/tilsvarende sikker løsning, med minst mulige rettigheter; aldri i prosjektfil, chat eller ZIP. Denne leveransen ber ikke om eller bruker slike nøkler.
-
-**Den gamle Alchemy-nøkkelen lå i vedlagte ZIP og må roteres/revokeres hos Alchemy.** Bruk en ny nøkkel i en lokal `.env` som `.gitignore` utelukker. Ingen gammel nøkkel eller `.env` følger denne leveransen. Ikke last opp din `.env`, original-ZIP med gammel nøkkel eller prosesslogger som viser endpointet.
-
-## Filer
-
-- `WINDOWS.md`: eksakt kjøreoppskrift med Windows + WSL2.
-- `chain.py`: Ethereum Keccak/ABI, lesesperre, SQLite-cache og redigerte feil.
-- `market.py`: reell historisk state, orakler, FX, størrelsessøk og konkurranseproxy.
-- `contracts/Replay.sol`, `fork.py`: atomisk lokal EVM, gas og revert/minProfit-kontroll.
-- `preflight.py`: liten reell arkiv-/fork-test før stor innsamling.
-- `collect.py`: sammenhengende blokkinnsamling, checkpoint, manglende-data-sperrer og proveniens.
-- `model.py`: portefølje, begge finansieringsformer og kanaler, risikostyring og antakelser.
-- `analyze.py`: NOK-kurver, drawdown, tellere, sensitiviteter, walk-forward, minst 1000 Monte Carlo per kombinasjon og merket rapport.
-- `tests/`: syntetiske enhetstester; de produserer ingen historiske resultatrapporter.
-- `STATUS.md`: nøyaktig hva som faktisk ble kjørt i leveransemiljøet.
+Den ligger fortsatt i repoet, men brukes ikke av nettsiden. Se [BACKTEST.md](BACKTEST.md), [WINDOWS.md](WINDOWS.md) og [STATUS.md](STATUS.md) for det opprinnelige backtestarbeidet. Ingen historisk avkastning påstås målt der. [ALCHEMY.md](ALCHEMY.md) beskriver også den separate Python-tilkoblingstesten; for nettsiden legger du nøklene direkte i Netlify.
