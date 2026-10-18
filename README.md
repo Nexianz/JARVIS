@@ -2,6 +2,8 @@
 
 **Historisk undersøkelse: [kvotesikring](KVOTE.md), deretter [døgnpilot](PILOT.md) på Windows. Ikke start gamle fullkjøringskommandoer før pilot og kvote er avklart. Nettsiden nedenfor er en separat paper-demo.**
 
+Godkjent bredere test med åtte datoer, hver 20. blokk og delt CU-tak: [BATCH.md](BATCH.md). Batchen starter bare med `--run`; uten flagget vises kun estimatet, uten nettverkskall.
+
 Netlify-hostet nettside som følger USDC/WETH på Ethereum mainnet og viser en agents beslutninger og paperhandler. Startkapitalen er **ANTATT 5000 NOK**. Ingen wallet, privatnøkler eller ekte handler. **Ingen Ubuntu, Python eller Foundry er nødvendig for nettsiden.**
 
 Agenten sjekker Uniswap V2, SushiSwap V2 og Uniswap V3 0,05/0,30 %. Netlify Functions holder nøkler på serveren; Netlify Blobs beholder porteføljen mellom besøk og deployer. En planlagt funksjon skanner omtrent hvert minutt når agenten er startet. Det går også uten at nettleseren er åpen.

@@ -1,0 +1,11 @@
+{
+  "label": "BEREGNET CU from ANTATTE rates, reported by user; not independently billed usage",
+  "source": "User-supplied completed pilot terminal output; 2025-06-01",
+  "date": "2025-06-01",
+  "every_n_blocks": 60,
+  "estimated_pilot_cu": 290544,
+  "blocks": 7143,
+  "evaluated_blocks": 90,
+  "warning": "No positive candidates in this pilot. Volatile days and EVM size searches can be much more expensive. Linear estimate is not an upper bound.",
+  "cu_profile_sha256": "15335a0b000f074df8b2cc7e0b4e627f934ad6aa6b9eda8da1936eca60c53430"
+}

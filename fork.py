@@ -6,7 +6,8 @@ HARNESS='0x1000000000000000000000000000000000000001'
 SENDER='0x1000000000000000000000000000000000000002'
 OUTCOME=topic('Outcome(uint256)')
 class Fork:
-    def __init__(self,upstream,artifact='out/Replay.sol/Replay.json'):
+    def __init__(self,upstream,artifact='out/Replay.sol/Replay.json',hardfork='prague'):
+        if hardfork not in ('cancun','prague','osaka'):raise ValueError('Unsupported execution hardfork')
         self.upstream=upstream
         self.code=json.loads(pathlib.Path(artifact).read_text())['deployedBytecode']['object']
         if not self.code.startswith('0x'):self.code='0x'+self.code
@@ -18,7 +19,7 @@ class Fork:
         for name in ('ETH_RPC_URL','ALCHEMY_ENDPOINT','ALCHEMY_API_KEY','ANVIL_FORK_URL','ANVIL_FORK_BLOCK_NUMBER','FOUNDRY_ETH_RPC_URL','FOUNDRY_FORK_URL','ANVIL_RPC_URL','ETH_RPC_JWT','ETH_RPC_HEADERS'):
             child_env.pop(name,None)
         child_env['NO_PROXY']=','.join(filter(None,[child_env.get('NO_PROXY',''),'127.0.0.1','localhost']))
-        self.proc=subprocess.Popen(['anvil','--host','127.0.0.1','--port',str(port),'--chain-id','31337','--hardfork','prague','--no-mining','--silent'],stdout=self.log,stderr=self.log,env=child_env)
+        self.proc=subprocess.Popen(['anvil','--host','127.0.0.1','--port',str(port),'--chain-id','31337','--hardfork',hardfork,'--no-mining','--silent'],stdout=self.log,stderr=self.log,env=child_env)
         for _ in range(100):
             if self.proc.poll() is not None:raise RuntimeError('Anvil failed to start')
             try:

@@ -5,11 +5,13 @@ from market import *
 from collect import fee_tip
 from fork import Fork
 from quota import QuotaClient,QuotaGateway,DEFAULT_MAX_CU
+from hardforks import hardfork_for_range
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--date',default='2025-06-01')
     ap.add_argument('--max-cu',type=int,default=DEFAULT_MAX_CU);ap.add_argument('--quota-dir',default='.cache/alchemy')
     args=ap.parse_args()
+    hardfork=hardfork_for_range(timestamp(args.date),timestamp(args.date)+86400)
     if not shutil.which('anvil') or not pathlib.Path('out/Replay.sol/Replay.json').exists():
         raise RuntimeError('Local replay tools/artifact are missing. No Alchemy request sent. Do not start preflight before the pilot prerequisites are prepared.')
     load_env()
@@ -20,7 +22,7 @@ def main():
             b=rpc.at_time(timestamp(args.date));market=Market(rpc,b-1);market.snapshot(b-1);fee_tip(rpc,b-1)
             print('PASS: historical headers, pool age/tokens/fees, state, Aave premium and measured priority-fee data.')
             with QuotaGateway(meter) as gateway:
-                fork=Fork(gateway.url)
+                fork=Fork(gateway.url,hardfork=hardfork)
                 try:
                     prev=rpc.block(b-1);block=dict(rpc.block(b),timestamp=hex(int(prev['timestamp'],16)+12),miner=prev['miner'],priorityFeeWei=fee_tip(rpc,b-1))
                     for flash in [True,False]:

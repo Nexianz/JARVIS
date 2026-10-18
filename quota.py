@@ -21,8 +21,12 @@ class UncertainRequest(RPCError): pass
 
 class QuotaClient:
     def __init__(self, url, directory='.cache/alchemy', max_cu=DEFAULT_MAX_CU,
-                 costs_path=None, opener=None, max_requests=100000, retry_uncertain=False):
+                 costs_path=None, opener=None, max_requests=100000, retry_uncertain=False,
+                 scope=None, scope_max_cu=None):
         if not isinstance(max_cu, int) or max_cu <= 0:raise ValueError('--max-cu must be a positive integer')
+        if scope_max_cu is not None and (not scope or not isinstance(scope_max_cu,int) or scope_max_cu<=0):
+            raise ValueError('A positive scoped CU limit requires a scope')
+        self.scope=scope;self.scope_max_cu=scope_max_cu
         self.url=url  # Memory only: never part of a cache key, log, summary or exception.
         self.folder=pathlib.Path(directory);self.folder.mkdir(parents=True,exist_ok=True)
         self.profile=json.loads(pathlib.Path(costs_path or pathlib.Path(__file__).with_name('cu_costs.json')).read_text())
@@ -42,6 +46,8 @@ class QuotaClient:
           CREATE TABLE IF NOT EXISTS blocks (n INTEGER PRIMARY KEY,h TEXT UNIQUE NOT NULL,v TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY,k TEXT NOT NULL,method TEXT NOT NULL,cu INTEGER NOT NULL,status TEXT NOT NULL,at REAL NOT NULL);
           CREATE INDEX IF NOT EXISTS attempts_key ON attempts(k,status);
+          CREATE TABLE IF NOT EXISTS attempt_scopes (attempt_id INTEGER PRIMARY KEY,scope TEXT NOT NULL);
+          CREATE INDEX IF NOT EXISTS attempt_scopes_scope ON attempt_scopes(scope);
         ''')
         saved=self.db.execute("SELECT v FROM meta WHERE k='profile'").fetchone()
         if saved and saved[0]!=self.profile_hash:
@@ -50,6 +56,8 @@ class QuotaClient:
         self.start_cu=self._used();self.rpc=GuardedRPC(self);self.head=None;self.session_metadata={}
         self.write_summary()
     def _used(self):return self.db.execute('SELECT COALESCE(SUM(cu),0) FROM attempts').fetchone()[0]
+    def _scope_used(self):
+        return self.db.execute('SELECT COALESCE(SUM(a.cu),0) FROM attempts a JOIN attempt_scopes s ON a.id=s.attempt_id WHERE s.scope=?',(self.scope,)).fetchone()[0]
     def summary(self):
         with self.lock:
             rows=self.db.execute('SELECT method,COUNT(*),SUM(cu),SUM(status=\'success\'),SUM(status=\'failed\'),SUM(status IN (\'pending\',\'unknown-retried\')) FROM attempts GROUP BY method ORDER BY method').fetchall()
@@ -59,6 +67,7 @@ class QuotaClient:
                         estimated_cu_this_invocation=used-self.start_cu,remaining_estimated_cu=max(0,self.max_cu-used),
                         attempt_count_label='MÅLT lokalt: reserverte nettverksforsøk, inkludert feil/ukjent levering',
                         cache_hits_this_invocation=self.cache_hits,stop_reason=self.stopped,
+                        scope=self.scope,scope_max_cu=self.scope_max_cu,scope_estimated_cu_reserved=self._scope_used() if self.scope else None,
                         by_method={r[0]:dict(attempts=r[1],estimated_cu=r[2],successful=r[3],failed=r[4],uncertain=r[5],estimated_cu_per_attempt=self.costs[r[0]]) for r in rows})
     def write_summary(self):
         with self.lock:
@@ -96,6 +105,11 @@ class QuotaClient:
             if used>=self.max_cu or used+cost>self.max_cu:
                 self.stopped=f'CU-GRENSE: {used} estimert CU reservert; neste {method} trenger {cost}; grense {self.max_cu}. Ingen nytt kall sendt.'
                 raise QuotaStop(self.stopped)
+            if self.scope_max_cu is not None:
+                scoped=self._scope_used()
+                if scoped>=self.scope_max_cu or scoped+cost>self.scope_max_cu:
+                    self.stopped=f'DAGSGRENSE: {scoped} estimert CU reservert for {self.scope}; neste kall trenger {cost}; grense {self.scope_max_cu}. Ingen nytt kall sendt.'
+                    raise QuotaStop(self.stopped)
             if self.invocation_requests>=self.max_requests:
                 self.stopped='RPC-forsøksgrensen er nådd. Ingen nytt kall sendt.';raise QuotaStop(self.stopped)
             pending=self.db.execute("SELECT id FROM attempts WHERE status='pending' LIMIT 1").fetchone()
@@ -104,6 +118,7 @@ class QuotaClient:
                 raise UncertainRequest('En tidligere forespørsel ble avbrutt før resultatet ble lagret. Levering er ukjent; ingen automatisk gjentakelse. Se KVOTE.md.')
             if pending:self.db.execute("UPDATE attempts SET status='unknown-retried' WHERE status='pending'")
             row=self.db.execute("INSERT INTO attempts(k,method,cu,status,at) VALUES (?,?,?,'pending',?)",(k,method,cost,time.time()))
+            if self.scope:self.db.execute('INSERT INTO attempt_scopes VALUES (?,?)',(row.lastrowid,self.scope))
             self.db.commit();self.invocation_requests+=1
             return row.lastrowid
         except BaseException:self.db.rollback();raise

@@ -124,15 +124,18 @@ def markdown(report):
     return '\n'.join(lines) + '\n'
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--date', default='2025-06-01')
     ap.add_argument('--every-n-blocks', type=int, default=60)
     ap.add_argument('--max-cu', type=int, default=DEFAULT_MAX_CU)
     ap.add_argument('--quota-dir', default='.cache/alchemy')
     ap.add_argument('--output')
+    ap.add_argument('--max-cu-per-day',type=int,help='Persistent per-date ceiling, in addition to cumulative --max-cu')
+    ap.add_argument('--verify-replay',action='store_true',help='Require date-specific minProfit replay before collection')
+    ap.add_argument('--quiet-report',action='store_true',help='Save full report but print only its location')
     ap.add_argument('--retry-uncertain', action='store_true')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     start = datetime.date.fromisoformat(args.date)
     end = (start + datetime.timedelta(days=1)).isoformat()
     folder = pathlib.Path(args.output or f'results/pilot-{args.date}-n{args.every_n_blocks}')
@@ -140,10 +143,13 @@ def main():
                                       '--every-n-blocks', str(args.every_n_blocks), '--max-cu', str(args.max_cu),
                                       '--quota-dir', args.quota_dir])
     collect.validate_args(ca, pilot=True)
+    ca.verify_replay=args.verify_replay
     load_env()
     folder.mkdir(parents=True, exist_ok=True)
     baseline_path = folder / 'pilot-cu-start.json'
-    with QuotaClient(rpc_url(), args.quota_dir, args.max_cu, retry_uncertain=args.retry_uncertain) as meter:
+    scope='pilot:USDC-WETH:'+args.date if args.max_cu_per_day is not None else None
+    with QuotaClient(rpc_url(), args.quota_dir, args.max_cu, retry_uncertain=args.retry_uncertain,
+                     scope=scope,scope_max_cu=args.max_cu_per_day) as meter:
         try:
             baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else dict(
                 cu=meter.summary()['estimated_cu_reserved'], quota_dir=str(pathlib.Path(args.quota_dir).resolve()))
@@ -163,11 +169,14 @@ def main():
             spent = summary['estimated_cu_reserved'] - baseline['cu']
             cu = dict(cumulative=summary['estimated_cu_reserved'], pilot=spent, days30=spent * 30, days90=spent * 90)
             report = build_report(manifest, rows, valuations, cu)
+            report.update(date=args.date,pair='USDC-WETH',hardfork=manifest['hardfork'],replay_verified=manifest.get('replay_verified',False),
+                          per_day_cu=summary['scope_estimated_cu_reserved'])
             (folder / 'pilot.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
             text = markdown(report)
             (folder / 'PILOT.md').write_text(text, encoding='utf-8')
-            print(text)
+            if not args.quiet_report:print(text)
             print('Rapport lagret:', folder / 'PILOT.md', flush=True)
+            return report
         finally:
             meter.write_summary()
             s = meter.summary()

@@ -23,6 +23,37 @@ class QuotaTests(unittest.TestCase):
     def tearDown(self):self.tmp.cleanup()
     def client(self,**kw):return QuotaClient('https://example.invalid/SECRET_KEY',self.tmp.name,opener=self.transport,**kw)
     def test_default_is_five_percent(self):self.assertEqual(DEFAULT_MAX_CU,1500000)
+    def test_per_day_limit_persists_and_cache_costs_zero_on_resume(self):
+        settings=dict(max_cu=1000,scope='pilot:day1',scope_max_cu=52)
+        with self.client(**settings) as q:
+            q.call('eth_call',[{'to':'0x01'},'0xa'])
+        with self.client(**settings) as q:
+            q.call('eth_call',[{'to':'0x01'},'0xa'])
+            with self.assertRaises(QuotaStop):q.call('eth_call',[{'to':'0x02'},'0xa'])
+            self.assertEqual(q.summary()['scope_estimated_cu_reserved'],52)
+        self.assertEqual(len(self.transport.requests),1)
+    def test_daily_scopes_share_cumulative_ceiling_including_unscoped_history(self):
+        with self.client(max_cu=104) as q:q.call('eth_call',[{'to':'0x01'},'0xa'])
+        with self.client(max_cu=104,scope='day2',scope_max_cu=52) as q:
+            q.call('eth_call',[{'to':'0x02'},'0xa'])
+            self.assertEqual(q.summary()['scope_estimated_cu_reserved'],52)
+        with self.client(max_cu=104,scope='day3',scope_max_cu=52) as q:
+            with self.assertRaises(QuotaStop):q.call('eth_call',[{'to':'0x03'},'0xa'])
+        self.assertEqual(len(self.transport.requests),2)
+    def test_failed_requests_reserve_daily_allowance(self):
+        self.transport.fail=urllib.error.HTTPError('https://example.invalid/SECRET',503,'bad',{},None)
+        with self.client(max_cu=1000,scope='day',scope_max_cu=52) as q:
+            with self.assertRaises(RPCError):q.call('eth_call',[{'to':'0x01'},'0xa'])
+            self.assertEqual(q.summary()['scope_estimated_cu_reserved'],52)
+            with self.assertRaises(QuotaStop):q.call('eth_call',[{'to':'0x02'},'0xa'])
+        self.assertEqual(len(self.transport.requests),1)
+    def test_cached_request_from_another_day_uses_no_daily_allowance(self):
+        with self.client(max_cu=1000,scope='day1',scope_max_cu=52) as q:q.call('eth_call',[{'to':'0x01'},'0xa'])
+        with self.client(max_cu=1000,scope='day2',scope_max_cu=52) as q:
+            q.call('eth_call',[{'to':'0x01'},'0xa'])
+            self.assertEqual(q.summary()['scope_estimated_cu_reserved'],0)
+            q.call('eth_call',[{'to':'0x02'},'0xa'])
+        self.assertEqual(len(self.transport.requests),2)
     def test_preflight_reservation_stops_before_overspend(self):
         with self.client(max_cu=51) as q:
             with self.assertRaises(QuotaStop):q.rpc.call('eth_call',[{},'0xa'])

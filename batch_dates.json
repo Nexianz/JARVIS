@@ -1,0 +1,68 @@
+{
+  "source": "https://github.com/coinmetrics/data/blob/master/csv/eth.csv",
+  "source_sha256": "46b18f3df967405374b1f6ee8a3d11ee1b7a5b176ac9fb4342caf6bf8648f2cc",
+  "labels": {
+    "price_usd": "M\u00c5LT external Coin Metrics PriceUSD, not mainnet pool data",
+    "change_percent": "BEREGNET versus previous daily observation",
+    "selection": "ANTATT: illustrative stress/control sample, not representative"
+  },
+  "warning": "Small net daily price change is not evidence of low intraday volatility. Daily labels follow the source dataset. These are selection inputs, not backtest results.",
+  "dates": [
+    {
+      "date": "2025-03-10",
+      "price_usd": 1879.69313354763,
+      "previous_date": "2025-03-09",
+      "previous_price_usd": 2015.69220105202,
+      "change_percent": -6.747015612473472
+    },
+    {
+      "date": "2025-04-09",
+      "price_usd": 1662.90904646406,
+      "previous_date": "2025-04-08",
+      "previous_price_usd": 1471.09076125073,
+      "change_percent": 13.03918767393013
+    },
+    {
+      "date": "2025-06-19",
+      "price_usd": 2523.04524547049,
+      "previous_date": "2025-06-18",
+      "previous_price_usd": 2522.49356750438,
+      "change_percent": 0.0218703418402022
+    },
+    {
+      "date": "2025-07-29",
+      "price_usd": 3790.87183372297,
+      "previous_date": "2025-07-28",
+      "previous_price_usd": 3790.9041452367,
+      "change_percent": -0.0008523432007745413
+    },
+    {
+      "date": "2025-08-22",
+      "price_usd": 4831.10497749854,
+      "previous_date": "2025-08-21",
+      "previous_price_usd": 4222.5846157218,
+      "change_percent": 14.411087453666592
+    },
+    {
+      "date": "2025-10-10",
+      "price_usd": 3867.07758883694,
+      "previous_date": "2025-10-09",
+      "previous_price_usd": 4368.90794301578,
+      "change_percent": -11.486402568428467
+    },
+    {
+      "date": "2026-01-24",
+      "price_usd": 2950.6620654588,
+      "previous_date": "2026-01-23",
+      "previous_price_usd": 2951.59461922852,
+      "change_percent": -0.031594913598387286
+    },
+    {
+      "date": "2026-02-05",
+      "price_usd": 1850.0371659848,
+      "previous_date": "2026-02-04",
+      "previous_price_usd": 2147.39338924605,
+      "change_percent": -13.847310173831351
+    }
+  ]
+}

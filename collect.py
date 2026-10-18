@@ -7,6 +7,7 @@ from market import *
 from fork import Fork
 from quota import QuotaClient,QuotaGateway,QuotaStop,DEFAULT_MAX_CU
 from selection import SwapFilter,Checkpoints,sampled
+from hardforks import hardfork_for_range
 
 def fee_tip(rpc,b):return priority_fee(rpc,b)
 def parser():
@@ -62,7 +63,8 @@ def run(args,meter):
     if int(rpc.call('eth_chainId',[]),16)!=1:raise RuntimeError('Ethereum mainnet only')
     # Freeze block bounds on first run. Resume never redoes time-to-block discovery.
     old=json.loads(mp.read_text()) if mp.exists() else None
-    settings=dict(start=args.start,end_exclusive=args.end,capital_nok=args.capital_nok,every_n_blocks=args.every_n_blocks,swap_filter='prior_block_only',log_chunk_blocks=args.log_chunk_blocks,smoke_only=bool(args.smoke_blocks),smoke_blocks=args.smoke_blocks)
+    hardfork=hardfork_for_range(start,end)
+    settings=dict(start=args.start,end_exclusive=args.end,capital_nok=args.capital_nok,every_n_blocks=args.every_n_blocks,swap_filter='prior_block_only',log_chunk_blocks=args.log_chunk_blocks,smoke_only=bool(args.smoke_blocks),smoke_blocks=args.smoke_blocks,hardfork=hardfork,verify_replay=bool(getattr(args,'verify_replay',False)))
     if old:
         for k,v in settings.items():
             if old.get(k)!=v:raise RuntimeError('Resume settings differ. Use a new output folder; quota/cache stay shared.')
@@ -93,13 +95,20 @@ def run(args,meter):
         with QuotaGateway(meter) as gateway:
             fork=None
             try:
+                if settings['verify_replay'] and not (old or {}).get('replay_verified'):
+                    print('Checking local minProfit replay for '+args.start+' ('+hardfork+'); all archive reads metered.',flush=True)
+                    fork=Fork(gateway.url,hardfork=hardfork)
+                    verify_replay(rpc,market,fork,meter,first)
+                    manifest['replay_verified']=True
+                    mp.write_text(json.dumps(manifest,indent=2,ensure_ascii=False),encoding='utf-8')
+                elif (old or {}).get('replay_verified'):manifest['replay_verified']=True
                 for b in range(first,last+1):
                     if b in checkpoints.completed:continue
                     row=dict(block=b,state_block=b-1)
                     if not sampled(b,first,args.every_n_blocks):row['selection']='sampling_skipped'
                     elif not swap_filter.active(b-1):row['selection']='no_prior_swap'
                     else:
-                        if fork is None:fork=Fork(gateway.url)
+                        if fork is None:fork=Fork(gateway.url,hardfork=hardfork)
                         row=evaluate_block(rpc,market,fork,meter,b,ref_cap)
                     checkpoints.add(row)
                     if (b-first)%100==0:
@@ -115,10 +124,18 @@ def run(args,meter):
         manifest['completed_blocks']=len(checkpoints.completed);manifest['selection_counts']=checkpoints.counts
         manifest['cu_summary']=meter.summary();mp.write_text(json.dumps(manifest,indent=2,ensure_ascii=False),encoding='utf-8')
 
+def verify_replay(rpc,market,fork,meter,b):
+    prev=rpc.block(b-1);block=dict(rpc.block(b),timestamp=hex(int(prev['timestamp'],16)+12),miner=prev['miner'],priorityFeeWei=fee_tip(rpc,b-1))
+    for flash in (True,False):
+        try:result=fork.execute(b-1,block,dict(first=0,second=1,amount=100*10**6),flash,force_revert=True,prefund=10*10**6 if flash else 0)
+        finally:meter.raise_if_stopped()
+        if result['ok'] or result['revert_reason']!='minProfit':raise RuntimeError('Date-specific local replay did not reach minProfit: '+str(result['revert_reason']))
+    print('PASS: date-specific local replay reaches minProfit in both modes. No real transaction/deployment.',flush=True)
+
 def validate_args(args,pilot=False):
     if args.every_n_blocks<1 or not 1<=args.log_chunk_blocks<=10 or args.smoke_blocks<0:raise ValueError('Invalid sampling/log chunk/smoke-block count')
     start,end=timestamp(args.start),timestamp(args.end)
-    if start<timestamp('2025-05-08') or end>timestamp('2025-12-02') or end<=start:raise ValueError('Supported Prague window: 2025-05-08 <= start < end <= 2025-12-02')
+    hardfork_for_range(start,end)
     if pilot:
         if end-start!=86400 or args.smoke_blocks:raise ValueError('Pilot must cover exactly one UTC day without smoke truncation')
     elif end-start<30*86400 and not args.smoke_blocks:raise ValueError('Use pilot.py for the one-day pilot')
