@@ -114,32 +114,38 @@ def rpc_url(environ=None):
 
 
 def priority_fee(rpc,block):
-    """Measured gas-weighted median tip; receipts are a verified historical fallback."""
+    """Measured gas-weighted median; never fan out into per-transaction RPCs.
+
+    Bulk failures are not treated as permanently unsupported: the next distinct
+    block may succeed. A completed measurement is memoized for this RPC session.
+    No automatic retries of a failed request and no fixed fee substitutions.
+    """
     sources=getattr(rpc,'priority_fee_sources',{})
     rpc.priority_fee_sources=sources
-    if not getattr(rpc,'_fee_history_unavailable',False):
-        try:
-            h=rpc.call('eth_feeHistory',['0x1',hex(block),[50]])
-            if int(h['oldestBlock'],16)!=block or len(h['reward'])!=1 or len(h['reward'][0])!=1:
-                raise RPCError('Invalid historical feeHistory range/reward')
-            value=int(h['reward'][0][0],16)
-            if value<0:raise RPCError('Negative historical priority fee')
-            sources[block]='eth_feeHistory gas-weighted median'
-            return value
-        except (RPCError,KeyError,ValueError,TypeError):
-            # Once a provider fails historical feeHistory, avoid repeating its retries for every block.
-            rpc._fee_history_unavailable=True
+    values=getattr(rpc,'priority_fee_values',{})
+    rpc.priority_fee_values=values
+    if block in values:return values[block]
+    try:
+        h=rpc.call('eth_feeHistory',['0x1',hex(block),[50]])
+        if int(h['oldestBlock'],16)!=block or len(h['reward'])!=1 or len(h['reward'][0])!=1:
+            raise RPCError('Invalid historical feeHistory range/reward')
+        value=int(h['reward'][0][0],16)
+        if value<0:raise RPCError('Negative historical priority fee')
+        sources[block]='eth_feeHistory gas-weighted median'
+        values[block]=value
+        return value
+    except (RPCError,KeyError,ValueError,TypeError):
+        pass
     header=rpc.block(block);transactions=header.get('transactions')
     if not isinstance(transactions,list):raise RPCError('Missing block transaction list for receipt verification')
-    receipts=None;source='eth_getBlockReceipts'
-    if not getattr(rpc,'_block_receipts_unavailable',False):
-        try:
-            receipts=rpc.call('eth_getBlockReceipts',[hex(block)])
-            if not isinstance(receipts,list):raise RPCError('Block receipts unavailable')
-        except RPCError:rpc._block_receipts_unavailable=True
-    if receipts is None or getattr(rpc,'_block_receipts_unavailable',False):
-        source='eth_getTransactionReceipt'
-        receipts=[rpc.call('eth_getTransactionReceipt',[tx]) for tx in transactions]
+    source='eth_getBlockReceipts'
+    try:
+        receipts=rpc.call('eth_getBlockReceipts',[hex(block)])
+        if not isinstance(receipts,list):raise RPCError('Block receipts unavailable')
+    except RPCError:
+        raise RPCError('Historical priority fee unavailable for block '+str(block)+
+                       ': feeHistory and block receipts failed. Stopped without individual receipt fan-out or fixed fee estimate. '
+                       'Keep cache/quota ledger; inspect provider access/status before resuming.') from None
     expected=set(transactions);seen=set();weighted=[];total=0
     try:
         if len(receipts)!=len(transactions):raise ValueError()
@@ -155,9 +161,9 @@ def priority_fee(rpc,block):
     except (KeyError,TypeError,ValueError):
         raise RPCError('Historical receipts missing/inconsistent: cannot measure priority fee; no fixed estimate substituted') from None
     sources[block]=source+'; gas-weighted median of effectiveGasPrice - baseFeePerGas'
-    if not total:return 0
+    if not total:values[block]=0;return 0
     cumulative=0
     for tip,gas in sorted(weighted):
         cumulative+=gas
-        if cumulative>=(total+1)//2:return tip
+        if cumulative>=(total+1)//2:values[block]=tip;return tip
     raise RPCError('Cannot calculate historical priority fee')

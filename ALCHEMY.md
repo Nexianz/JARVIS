@@ -80,9 +80,9 @@ Deretter full innsamling og analyse som beskrevet i Windows-guiden. Historisk EV
 
 ## Historisk eth_feeHistory gir HTTP 503
 
-Mainnet/arkiv-PASS etterfulgt av 503 for `eth_feeHistory` betyr at den metoden feilet; det beviser ikke feil nøkkel. Koden prøver først feeHistory med begrensede retries, deretter `eth_getBlockReceipts`. Hvis bulk-kvitteringer ikke støttes, hentes individuelle `eth_getTransactionReceipt` for transaksjonene i blokken.
+Mainnet/arkiv-PASS etterfulgt av 503 for `eth_feeHistory` betyr at den metoden feilet; det beviser ikke feil nøkkel. Koden prøver først `eth_feeHistory`, deretter `eth_getBlockReceipts`. I den kvotebeskyttede klienten er det ingen automatiske nettverksretries. Hvis begge metodene feiler, stopper jobben. Automatisk uthenting av én `eth_getTransactionReceipt` per transaksjon er fjernet: den kunne bruke hundrevis av kall per blokk og tømme dagsbudsjettet.
 
-For hver kvittering brukes faktisk `effectiveGasPrice − baseFeePerGas`, vektet med faktisk `gasUsed`. Blokknummer, blokkhash, fullstendig/unik transaksjonsliste og summert block gasUsed kontrolleres. Dette er målte historiske fees, ikke et fast anslag. Tom blokk gir null; manglende/inkonsistente kvitteringer stopper kjøringen. Kilden logges i blokkradene og vises i tilkoblingstesten. Reserveveien kan bruke betydelig mer data og flere RPC-kall. Etter første metodefeil gjenbrukes reserveveien resten av prosessen.
+For hver kvittering brukes faktisk `effectiveGasPrice − baseFeePerGas`, vektet med faktisk `gasUsed`. Blokknummer, blokkhash, fullstendig/unik transaksjonsliste og summert block gasUsed kontrolleres. Dette er målte historiske fees, ikke et fast anslag. Tom blokk gir null; manglende/inkonsistente kvitteringer stopper kjøringen. Kilden logges i blokkradene og vises i tilkoblingstesten. En fullført måling gjenbrukes i minnet og råsvar er diskcachet. Feil på én blokk slår ikke permanent av en metode for senere blokker. Ved avbrudd beholdes alle CU-reservasjoner og cache; feilstatus må undersøkes før ny kjøring. Ingen kvote nullstilles av rettelsen.
 
 Oppdater uten å endre `.env`:
 

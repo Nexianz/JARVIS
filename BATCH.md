@@ -75,3 +75,11 @@ Hver dato starter som et **uavhengig forsøk med 5000 NOK**, ikke en sammenhenge
 **Ikke lagt til eller blandet inn i denne kjøringen:** WBTC/USDC og DAI/USDC. Eksisterende Replay-kontrakt, fabrikkoppslag og rutekoder er spesifikke for de fire USDC/WETH-poolene. Flere par krever egen kontrakts-/ABI-endring, historisk validering av token/pool/fee-tier (inkludert relevante stablecoin-fees), egne likviditets-/risikosjekker og samme-dato-replay. En adresseendring alene gir ingen validert test. En eventuell ny kjøring må merkes som ny, holdes separat i rapporten og fortsatt inngå i det delte totale CU-taket; ingen ekstra par startes automatisk.
 
 Ærlig status: ennå ingen batchresultater og ingen påvist lønnsomhet. Selv en positiv modelltabell kan ikke vise at vi ville vunnet kappløpet om blokkplass. Ingen Monte Carlo, walk-forward eller kontinuerlig 30-dagers studie inngår i denne batchen.
+
+## Feilsøking etter første kjøring
+
+Brukeren rapporterte at 2025-03-10 stoppet ufullført ved dagstaket: 1 199 980 BEREGNET CU for datoen, 1 501 288 BEREGNET CU kumulativt. Den kumulative metodetabellen viste 30 991 individuelle `eth_getTransactionReceipt`-forsøk, tilsvarende 929 730 BEREGNET CU. Dette er brukeroppgitte lokale estimater, ikke verifisert Alchemy-fakturering eller fullførte lønnsomhetsresultater.
+
+Koden hadde en kostbar reservevei som etter én bulk-feil gikk permanent over til enkeltkvitteringer resten av prosessen. Det bekrefter en svakhet i reserveveien; loggen fastslår ikke hvilken HTTP-/RPC-feil som utløste den. Denne automatiske overgangen er fjernet. Hvis både feeHistory og block receipts feiler, stopper ny kode i stedet for å starte hundrevis av enkeltkall. Ingen fast gas-/priority-fee erstatter manglende data.
+
+Brukt CU forblir registrert. Datoen er fortsatt ufullført, og et nådd dagstak blir ikke borte ved oppdatering eller omstart. Ikke start den samme kjøringen igjen ukritisk. Kodeendringen krever dessuten ny resultatmappe under eksisterende kildehash-vern, mens samme delte cache/kvotelogg skal beholdes. Eventuelle endringer i de godkjente takene eller datoene må avklares separat; rettelsen øker ingen grense.

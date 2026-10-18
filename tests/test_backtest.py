@@ -194,10 +194,31 @@ class PriorityFeeFallbackTests(unittest.TestCase):
         r=self.Fake(history=True);self.assertEqual(priority_fee(r,10),2);self.assertNotIn('eth_getBlockReceipts',r.calls)
     def test_503_uses_actual_receipt_weighted_median(self):
         r=self.Fake();self.assertEqual(priority_fee(r,10),2);self.assertIn('eth_getBlockReceipts',r.priority_fee_sources[10])
-    def test_individual_receipts_if_bulk_unsupported(self):
-        r=self.Fake(bulk=False);self.assertEqual(priority_fee(r,10),2);self.assertEqual(r.calls.count('eth_getTransactionReceipt'),2)
+    def test_bulk_failure_stops_without_individual_receipt_fanout(self):
+        r=self.Fake(bulk=False)
+        with self.assertRaisesRegex(RPCError,'without individual receipt fan-out'):priority_fee(r,10)
+        self.assertNotIn('eth_getTransactionReceipt',r.calls)
+        self.assertEqual(r.calls.count('eth_getBlockReceipts'),1)
     def test_does_not_retry_broken_history_for_every_block(self):
         r=self.Fake();priority_fee(r,10);priority_fee(r,10);self.assertEqual(r.calls.count('eth_feeHistory'),1)
+    def test_new_block_can_use_fee_history_after_transient_failure(self):
+        r=self.Fake();self.assertEqual(priority_fee(r,10),2)
+        original=r.call
+        def recovered(method,params):
+            if method=='eth_feeHistory':
+                r.calls.append(method);return {'oldestBlock':'0xb','reward':[['0x7']]}
+            return original(method,params)
+        r.call=recovered
+        self.assertEqual(priority_fee(r,11),7)
+        self.assertEqual(r.calls.count('eth_getBlockReceipts'),1)
+    def test_bulk_failure_does_not_disable_bulk_on_later_block(self):
+        r=self.Fake(bulk=False)
+        with self.assertRaises(RPCError):priority_fee(r,10)
+        r.bulk=True;r.header['number']='0xb'
+        for receipt in r.receipts:receipt['blockNumber']='0xb'
+        self.assertEqual(priority_fee(r,11),2)
+        self.assertEqual(r.calls.count('eth_getBlockReceipts'),2)
+        self.assertNotIn('eth_getTransactionReceipt',r.calls)
     def test_wrong_block_hash_rejected(self):
         r=self.Fake();r.receipts[0]['blockHash']='0xwrong'
         with self.assertRaises(RPCError):priority_fee(r,10)
