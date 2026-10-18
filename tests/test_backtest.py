@@ -165,4 +165,47 @@ class FullURLSetupTests(unittest.TestCase):
         with unittest.mock.patch('sys.argv',['rpc_setup.py']),unittest.mock.patch('pathlib.Path.exists',return_value=False),unittest.mock.patch('getpass.getpass',side_effect=['','synthetic_key']) as prompt,unittest.mock.patch('rpc_setup.write_config') as save,unittest.mock.patch('sys.stdout',new_callable=io.StringIO):
             rpc_setup.main();self.assertEqual(prompt.call_count,2);save.assert_called_once_with('.env',DEFAULT_ALCHEMY_ENDPOINT,'synthetic_key')
 
+class PriorityFeeFallbackTests(unittest.TestCase):
+    class Fake:
+        def __init__(self,history=False,bulk=True):
+            self.history=history;self.bulk=bulk;self.calls=[]
+            self.header=dict(hash='0xblock',baseFeePerGas=hex(100),gasUsed=hex(400),transactions=['a','b'],number='0xa')
+            self.receipts=[dict(blockHash='0xblock',blockNumber='0xa',transactionHash='a',gasUsed=hex(300),effectiveGasPrice=hex(102)),dict(blockHash='0xblock',blockNumber='0xa',transactionHash='b',gasUsed=hex(100),effectiveGasPrice=hex(120))]
+        def block(self,n):return self.header
+        def call(self,m,p):
+            self.calls.append(m)
+            if m=='eth_feeHistory':
+                if self.history:return {'oldestBlock':'0xa','reward':[['0x2']]}
+                raise RPCError('HTTP 503; redacted')
+            if m=='eth_getBlockReceipts':
+                if not self.bulk:raise RPCError('Method unsupported')
+                return self.receipts
+            if m=='eth_getTransactionReceipt':return next(r for r in self.receipts if r['transactionHash']==p[0])
+            raise AssertionError(m)
+    def test_history_is_preferred(self):
+        r=self.Fake(history=True);self.assertEqual(priority_fee(r,10),2);self.assertNotIn('eth_getBlockReceipts',r.calls)
+    def test_503_uses_actual_receipt_weighted_median(self):
+        r=self.Fake();self.assertEqual(priority_fee(r,10),2);self.assertIn('eth_getBlockReceipts',r.priority_fee_sources[10])
+    def test_individual_receipts_if_bulk_unsupported(self):
+        r=self.Fake(bulk=False);self.assertEqual(priority_fee(r,10),2);self.assertEqual(r.calls.count('eth_getTransactionReceipt'),2)
+    def test_does_not_retry_broken_history_for_every_block(self):
+        r=self.Fake();priority_fee(r,10);priority_fee(r,10);self.assertEqual(r.calls.count('eth_feeHistory'),1)
+    def test_wrong_block_hash_rejected(self):
+        r=self.Fake();r.receipts[0]['blockHash']='0xwrong'
+        with self.assertRaises(RPCError):priority_fee(r,10)
+    def test_incomplete_receipts_rejected(self):
+        r=self.Fake();r.receipts.pop()
+        with self.assertRaises(RPCError):priority_fee(r,10)
+    def test_mismatched_total_gas_rejected(self):
+        r=self.Fake();r.header['gasUsed']=hex(401)
+        with self.assertRaises(RPCError):priority_fee(r,10)
+    def test_duplicate_transaction_rejected(self):
+        r=self.Fake();r.receipts[1]['transactionHash']='a'
+        with self.assertRaises(RPCError):priority_fee(r,10)
+    def test_empty_block_zero_tip(self):
+        r=self.Fake();r.receipts=[];r.header.update(transactions=[],gasUsed='0x0');self.assertEqual(priority_fee(r,10),0)
+    def test_missing_effective_price_never_uses_fixed_estimate(self):
+        r=self.Fake();del r.receipts[0]['effectiveGasPrice']
+        with self.assertRaises(RPCError):priority_fee(r,10)
+
 if __name__=='__main__':unittest.main()

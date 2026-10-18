@@ -10,7 +10,7 @@
 |DNS her|Oppslag mot Alchemy og npm-registry feilet|Kan ikke hente verktøy eller måle mainnet her|
 |Foundry/Anvil/Solidity|Ikke installert i miljøet|Solidity-kompilering og EVM-integrasjon er IKKE kjørt/verifisert|
 |Python|3.12 i leveransemiljøet; syntakskontroll bestått|Dette alene beviser ikke at backtesten virker mot en ekte node|
-|Lokale enhetstester|39 tester kjørt, 39 bestått|Syntetiske fixtures for ABI, kostnader, sizing, konkurranseproxy, risikokontroll og datasperrer; ingen avkastningsobservasjoner|
+|Lokale enhetstester|49 tester kjørt, 49 bestått|Syntetiske fixtures for ABI, kostnader, sizing, konkurranseproxy, risikokontroll og datasperrer; ingen avkastningsobservasjoner|
 |Historisk 30/90-dagers innsamling|IKKE kjørt|Ingen MÅLTE historiske mulighetstall eller avkastningstall|
 |Monte Carlo / walk-forward på reelle data|IKKE kjørt|Implementert, men ingen resultater er påstått|
 |Resultatgrafer og PnL-rapport|IKKE produsert|Ingen fabrikerte kurver, skjulte eksempel-fills eller demo-resultater|
@@ -27,3 +27,5 @@ Noen krav krever informasjon som ikke er fullt offentlig tilgjengelig. Konkurran
 Størrelsesvalg er et numerisk gitter med lokal forbedring og likviditetsgrenser, ikke et bevist globalt nettooptimum. Den langsiktige kjeden spilles ikke om etter våre kontrafaktiske handler; gjenbruk av helt uendret pooltilstand sperres som en begrenset beskyttelse. Disse forskjellene er synlige i rapportgeneratoren og skal ikke tones ned ved tolkning av senere resultater.
 
 **Sikkerhet om overskudd, tap eller null: ikke vurderbar før reelle data og integrasjon er kjørt.** Selv etter en kjøring vil private konkurranseforhold gi vesentlig modellusikkerhet. Et negativt funn eller null kvalifiserte handler er et akseptabelt resultat; det skal ikke erstattes av teoretiske spreads.
+
+Tilbakemelding fra Windows viste vellykket mainnet/arkivtilgang, men HTTP 503 for feeHistory. Reservevei via verifiserte kvitteringer er nå implementert og enhetstestet; den er ikke testet mot brukerens node i leveransemiljøet.

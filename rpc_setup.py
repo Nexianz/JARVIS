@@ -1,6 +1,6 @@
 """Local hidden-input configuration + read-only archive test. Never prints endpoint/key."""
 import argparse,getpass,os,pathlib,sys,warnings
-from chain import RPC,RPCError,load_env,rpc_url,DEFAULT_ALCHEMY_ENDPOINT
+from chain import RPC,RPCError,load_env,rpc_url,DEFAULT_ALCHEMY_ENDPOINT,priority_fee
 
 
 def write_config(path,endpoint,key=None):
@@ -26,7 +26,7 @@ def hidden_input(prompt):
 
 
 def check():
-    load_env();r=RPC(rpc_url(),budget=20)
+    load_env();r=RPC(rpc_url(),budget=2000)
     if int(r.call('eth_chainId',[]),16)!=1:raise RuntimeError('Endpoint is not Ethereum mainnet.')
     print('PASS: Ethereum mainnet connection (chain ID 1).')
     b=23_000_000;tag=hex(b)
@@ -38,9 +38,8 @@ def check():
     reserves=r.ethcall(pair,'getReserves()',block=b)
     if len(reserves)!=3 or not reserves[0] or not reserves[1]:raise RuntimeError('Historical pool reserves missing.')
     print('PASS: archive eth_call at explicit historical block 23000000.')
-    h=r.call('eth_feeHistory',['0x1',tag,[50]])
-    if not h.get('reward'):raise RuntimeError('Historical priority fees missing.')
-    print('PASS: historical priority-fee data. No transaction sent.')
+    priority_fee(r,b)
+    print('PASS: historical priority-fee data via '+r.priority_fee_sources[b]+'. No transaction sent.')
 
 
 def main():

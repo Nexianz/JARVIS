@@ -4,10 +4,7 @@ from chain import *
 from market import *
 from fork import Fork
 
-def fee_tip(rpc,b):
-    h=rpc.call('eth_feeHistory',['0x1',hex(b),[50]])
-    if not h.get('reward') or not h['reward'][0]:raise RuntimeError('Missing measured priority-fee distribution')
-    return int(h['reward'][0][0],16)
+def fee_tip(rpc,b):return priority_fee(rpc,b)
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--start',required=True);ap.add_argument('--end',required=True)
     ap.add_argument('--output',default='results/run');ap.add_argument('--rpc-budget',type=int,default=100000)
@@ -57,7 +54,7 @@ def main():
             if next_base(prev)!=int(block['baseFeePerGas'],16):raise RuntimeError('Unsupported base-fee rules/header inconsistency')
             snap=market.snapshot(p);pred_tip=fee_tip(rpc,p);actual_tip=fee_tip(rpc,b)
             simblock=dict(block,timestamp=hex(int(prev['timestamp'],16)+12),miner=prev['miner'],priorityFeeWei=pred_tip)
-            row=dict(block=b,hash=block['hash'],parent=prev['hash'],timestamp=int(block['timestamp'],16),day=day(int(block['timestamp'],16)),state_block=p,base_wei=int(block['baseFeePerGas'],16),tip_prior_wei=pred_tip,tip_current_measured_wei=actual_tip,snapshot=snap,candidates=[],screen_positive=0,evm_rejected=0)
+            row=dict(block=b,hash=block['hash'],parent=prev['hash'],timestamp=int(block['timestamp'],16),day=day(int(block['timestamp'],16)),state_block=p,base_wei=int(block['baseFeePerGas'],16),tip_prior_wei=pred_tip,tip_current_measured_wei=actual_tip,tip_prior_source=rpc.priority_fee_sources[p],tip_current_source=rpc.priority_fee_sources[b],snapshot=snap,candidates=[],screen_positive=0,evm_rejected=0)
             for flash in [True,False]:
                 for a in range(4):
                     for z in range(4):
