@@ -73,7 +73,15 @@ class RiskTests(unittest.TestCase):
         row,c,m=fixture();s=Assumptions();self.assertGreater(economics(c,row,m['fx'],dataclasses.replace(s,bid=.8))['net'],economics(c,row,m['fx'],dataclasses.replace(s,bid=.99))['net'])
     def test_min_profit_haircut_causes_revert(self):
         row,c,m=fixture();row['candidates']=[c];s=dataclasses.replace(Assumptions(),private_inclusion=1.,failure=0.,adverse_profit_haircut=.99,minimum_net_nok=0,margin_fraction=0)
-        r=simulate([row],m,s);self.assertEqual(r['counts'].get('failed'),1)
+        r=simulate([row],m,s,channel='public');self.assertEqual(r['counts'].get('failed'),1)
+    def test_private_revert_is_not_included_and_costs_nothing(self):
+        row,c,m=fixture();row['candidates']=[c]
+        s=dataclasses.replace(Assumptions(),private_inclusion=1.,failure=1.,minimum_net_nok=0,margin_fraction=0)
+        r=simulate([row],m,s)
+        self.assertEqual(r['counts'].get('private_rejected'),1)
+        self.assertEqual(r['counts'].get('failed',0),0)
+        self.assertEqual(r['gas_eth'],0)
+        self.assertEqual(r['builder_bid_eth'],0)
     def test_cannot_harvest_identical_pool_state_twice(self):
         row,c,m=fixture();row['candidates']=[c];r2=dict(row,block=2,timestamp=row['timestamp']+12)
         s=dataclasses.replace(Assumptions(),private_inclusion=1.,failure=0.,adverse_profit_haircut=0.,minimum_net_nok=0,margin_fraction=0)

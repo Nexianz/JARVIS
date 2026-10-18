@@ -1,6 +1,6 @@
 # JARVIS — ekte marked, fiktive penger
 
-**Historisk undersøkelse, nåværende steg 1: [kvotesikring](KVOTE.md). Ikke start gamle fullkjøringskommandoer før pilot og kvote er avklart. Nettsiden nedenfor er en separat paper-demo.**
+**Historisk undersøkelse: [kvotesikring](KVOTE.md), deretter [døgnpilot](PILOT.md) på Windows. Ikke start gamle fullkjøringskommandoer før pilot og kvote er avklart. Nettsiden nedenfor er en separat paper-demo.**
 
 Netlify-hostet nettside som følger USDC/WETH på Ethereum mainnet og viser en agents beslutninger og paperhandler. Startkapitalen er **ANTATT 5000 NOK**. Ingen wallet, privatnøkler eller ekte handler. **Ingen Ubuntu, Python eller Foundry er nødvendig for nettsiden.**
 

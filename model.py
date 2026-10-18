@@ -113,7 +113,11 @@ def simulate(rows,manifest,settings,mode='A',channel='private',seed=1,record_cur
                     haircut=rng.uniform(0,settings.adverse_profit_haircut)
                     paid_profit=c['profit_usdc']*(1-haircut)
                     failed=contested or rng.random()<settings.failure or paid_profit<e['contract_min_usdc']
-                    if failed:
+                    if failed and channel=='private':
+                        # Standard private bundles are simulated by the builder and
+                        # omitted as a whole on revert; no on-chain gas or bid paid.
+                        stats['private_rejected']+=1;stats['not_included']+=1
+                    elif failed:
                         cost=e['fail_eth'];eth-=cost;loss=cost*e['ethnok'];strategy_pnl-=loss;risk.record(row['timestamp'],-loss,True)
                         stats['failed']+=1;stats['gas_units']+=c['revert_gas']+settings.gas_safety_units
                         gas_eth_total+=cost;gas_nok_total+=loss

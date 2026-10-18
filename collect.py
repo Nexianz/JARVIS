@@ -115,14 +115,18 @@ def run(args,meter):
         manifest['completed_blocks']=len(checkpoints.completed);manifest['selection_counts']=checkpoints.counts
         manifest['cu_summary']=meter.summary();mp.write_text(json.dumps(manifest,indent=2,ensure_ascii=False),encoding='utf-8')
 
-def main():
-    args=parser().parse_args()
+def validate_args(args,pilot=False):
     if args.every_n_blocks<1 or not 1<=args.log_chunk_blocks<=10 or args.smoke_blocks<0:raise ValueError('Invalid sampling/log chunk/smoke-block count')
     start,end=timestamp(args.start),timestamp(args.end)
     if start<timestamp('2025-05-08') or end>timestamp('2025-12-02') or end<=start:raise ValueError('Supported Prague window: 2025-05-08 <= start < end <= 2025-12-02')
-    if end-start<30*86400 and not args.smoke_blocks:raise ValueError('Pilot command is not enabled in step 1; do not start a full study yet')
+    if pilot:
+        if end-start!=86400 or args.smoke_blocks:raise ValueError('Pilot must cover exactly one UTC day without smoke truncation')
+    elif end-start<30*86400 and not args.smoke_blocks:raise ValueError('Use pilot.py for the one-day pilot')
     # No dependency installation, node connection or deployment is done by this step.
     if not shutil.which('anvil') or not pathlib.Path('out/Replay.sol/Replay.json').exists():raise RuntimeError('Local replay prerequisites are not verified. Step 1 is quota infrastructure only; do not start collection yet.')
+
+def main():
+    args=parser().parse_args();validate_args(args)
     load_env()
     with QuotaClient(rpc_url(),args.quota_dir,args.max_cu,max_requests=args.rpc_budget,retry_uncertain=args.retry_uncertain) as meter:
         try:run(args,meter)

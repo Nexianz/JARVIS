@@ -1,6 +1,6 @@
 # Kjør på Windows, trinn for trinn
 
-**Historisk guide. Ny prosess starter med [KVOTE.md](KVOTE.md), steg 1. Ikke kjør de gamle 30/90-dagerskommandoene nedenfor nå. Pilot og fullkjøring avklares separat etter kvotesikring.**
+**Historisk guide nedenfor. Ny prosess: [KVOTE.md](KVOTE.md), deretter [PILOT.md](PILOT.md) med Windows-utgaven av Foundry, uten Ubuntu/WSL. Ikke kjør de gamle 30/90-dagerskommandoene nedenfor nå. Fullkjøring avklares etter pilotresultatet.**
 
 Fra GitHub-klonen: se [ALCHEMY.md](ALCHEMY.md) for nøkkeloppsett. Bruk `python3 rpc_setup.py` i Ubuntu-klonen eller lokal `.env`. ZIP-utpakking nedenfor er alternativet til Git-kloning.
 

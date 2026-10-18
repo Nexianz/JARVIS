@@ -2,6 +2,8 @@
 
 **Dette steget installerer/tester vern. Ingen pilot eller full kjedeinnsamling er kjørt i leveransemiljøet. Ingen handelsresultater eller resultatkurver er produsert.** Følg én ting om gangen; ikke bruk de gamle 30/90-dagerskommandoene nå.
 
+Når forutsetningene er bekreftet: se [PILOT.md](PILOT.md) for den separate døgnpiloten. Ingen fullkjøring startes automatisk.
+
 ## Grensen
 
 `--max-cu` har standard **1 500 000 estimert CU**: BEREGNET som 5 % av brukerens oppgitte 30 millioner CU. Beløpet er ikke et målt restbeløp hos Alchemy.
