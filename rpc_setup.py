@@ -1,6 +1,7 @@
 """Local hidden-input configuration + read-only archive test. Never prints endpoint/key."""
 import argparse,getpass,os,pathlib,sys,warnings
-from chain import RPC,RPCError,load_env,rpc_url,DEFAULT_ALCHEMY_ENDPOINT,priority_fee
+from chain import RPC,RPCError,BudgetStop,load_env,rpc_url,DEFAULT_ALCHEMY_ENDPOINT,priority_fee
+from quota import QuotaClient,DEFAULT_MAX_CU
 
 
 def write_config(path,endpoint,key=None):
@@ -25,26 +26,31 @@ def hidden_input(prompt):
         except getpass.GetPassWarning:raise RuntimeError('Hidden input unavailable; edit .env locally instead.') from None
 
 
-def check():
-    load_env();r=RPC(rpc_url(),budget=2000)
-    if int(r.call('eth_chainId',[]),16)!=1:raise RuntimeError('Endpoint is not Ethereum mainnet.')
-    print('PASS: Ethereum mainnet connection (chain ID 1).')
-    b=23_000_000;tag=hex(b)
-    if not r.block(b):raise RuntimeError('Historical block unavailable.')
-    factory='0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
-    usdc='0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';weth='0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
-    from chain import addr
-    pair=addr(r.ethcall(factory,'getPair(address,address)',usdc,weth,block=b)[0])
-    reserves=r.ethcall(pair,'getReserves()',block=b)
-    if len(reserves)!=3 or not reserves[0] or not reserves[1]:raise RuntimeError('Historical pool reserves missing.')
-    print('PASS: archive eth_call at explicit historical block 23000000.')
-    priority_fee(r,b)
-    print('PASS: historical priority-fee data via '+r.priority_fee_sources[b]+'. No transaction sent.')
+def check(max_cu=DEFAULT_MAX_CU):
+    load_env()
+    with QuotaClient(rpc_url(),max_cu=max_cu,max_requests=2000) as meter:
+        r=meter.rpc
+        try:
+            if int(r.call('eth_chainId',[]),16)!=1:raise RuntimeError('Endpoint is not Ethereum mainnet.')
+            print('PASS: Ethereum mainnet connection (chain ID 1).')
+            b=23_000_000
+            if not r.block(b):raise RuntimeError('Historical block unavailable.')
+            factory='0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
+            usdc='0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';weth='0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
+            from chain import addr
+            pair=addr(r.ethcall(factory,'getPair(address,address)',usdc,weth,block=b)[0])
+            reserves=r.ethcall(pair,'getReserves()',block=b)
+            if len(reserves)!=3 or not reserves[0] or not reserves[1]:raise RuntimeError('Historical pool reserves missing.')
+            print('PASS: archive eth_call at explicit historical block 23000000.')
+            priority_fee(r,b)
+            print('PASS: historical priority-fee data via '+r.priority_fee_sources[b]+'. No transaction sent.')
+        finally:
+            meter.write_summary();print('BEREGNET cumulative CU estimate:',meter.summary()['estimated_cu_reserved'],'(ANTATTE satser, not billed CU)')
 
 
 def main():
-    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--check',action='store_true',help='Read-only RPC check; requires no Foundry/Anvil');a=ap.parse_args()
-    if a.check:check();return
+    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--check',action='store_true',help='Read-only RPC check; requires no Foundry/Anvil');ap.add_argument('--max-cu',type=int,default=DEFAULT_MAX_CU);a=ap.parse_args()
+    if a.check:check(a.max_cu);return
     if pathlib.Path('.env').exists():raise RuntimeError('.env already exists. Edit it locally, then run python3 rpc_setup.py --check.')
     print('Use a NEW Alchemy Ethereum Mainnet key; revoke the one in the old ZIP.')
     endpoint=hidden_input('Endpoint template OR full HTTPS URL (hidden; Enter = default): ') or DEFAULT_ALCHEMY_ENDPOINT
@@ -58,7 +64,7 @@ def main():
 
 if __name__=='__main__':
     try:main()
-    except (RPCError,RuntimeError,ValueError,OSError) as e:
+    except (RPCError,BudgetStop,RuntimeError,ValueError,OSError) as e:
         if isinstance(e,(RPCError,RuntimeError)):print(str(e),file=sys.stderr)
         else:print('Configuration/check failed: '+type(e).__name__+' (details redacted)',file=sys.stderr)
         sys.exit(2)

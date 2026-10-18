@@ -14,7 +14,11 @@ class Fork:
         self.url=f'http://127.0.0.1:{port}';self.rpc=RPC(self.url,budget=10**12)
         self.log=tempfile.TemporaryFile()
         # No real key, fork URL or secret in command arguments/logs.
-        self.proc=subprocess.Popen(['anvil','--host','127.0.0.1','--port',str(port),'--chain-id','31337','--hardfork','prague','--no-mining','--silent'],stdout=self.log,stderr=self.log)
+        child_env=os.environ.copy()
+        for name in ('ETH_RPC_URL','ALCHEMY_ENDPOINT','ALCHEMY_API_KEY','ANVIL_FORK_URL','ANVIL_FORK_BLOCK_NUMBER','FOUNDRY_ETH_RPC_URL','FOUNDRY_FORK_URL','ANVIL_RPC_URL','ETH_RPC_JWT','ETH_RPC_HEADERS'):
+            child_env.pop(name,None)
+        child_env['NO_PROXY']=','.join(filter(None,[child_env.get('NO_PROXY',''),'127.0.0.1','localhost']))
+        self.proc=subprocess.Popen(['anvil','--host','127.0.0.1','--port',str(port),'--chain-id','31337','--hardfork','prague','--no-mining','--silent'],stdout=self.log,stderr=self.log,env=child_env)
         for _ in range(100):
             if self.proc.poll() is not None:raise RuntimeError('Anvil failed to start')
             try:
@@ -70,5 +74,8 @@ class Fork:
             else:reason='unknown revert: '+output[:8]
         return dict(ok=ok,gas=int(receipt['gasUsed'],16),profit=profit,revert_reason=reason)
     def close(self):
-        if self.proc.poll() is None:self.proc.terminate();self.proc.wait(timeout=10)
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:self.proc.kill();self.proc.wait(timeout=5)
         self.log.close()

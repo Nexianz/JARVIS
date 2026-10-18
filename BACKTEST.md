@@ -1,5 +1,7 @@
 # Historisk ETH-arbitrasje: forskningspakke, ikke handelsbot
 
+**Ny arbeidsflyt: først [KVOTE.md](KVOTE.md). De eldre kommandoene og rapportflyten er ikke godkjent for den nye pilot-/samplingsprosessen.**
+
 **Start her for API-nøkkel og endpoint: [ALCHEMY.md](ALCHEMY.md).** `python rpc_setup.py` lager lokal `.env` med skjult nøkkelinntasting; `python rpc_setup.py --check` tester lesetilgang uten Foundry.
 
 **Status: Ingen historisk avkastning er målt i leveransemiljøet.** Alchemy ga transportfeil; DNS-oppslag feilet, også etter separat tilgangsforsøk. Foundry/Anvil og Solidity-kompilatoren er ikke installert der. Python-koden er syntakskontrollert og enhetstestet med uttrykkelig syntetiske test-fixtures. Solidity-kompilering, arkivinnsamling og EVM-integrasjon må derfor verifiseres på din maskin med stegene nedenfor. Dette er ikke en påstand om ferdig verifisert backtest eller at alle krav er empirisk oppfylt.

@@ -1,5 +1,7 @@
 # Kjør på Windows, trinn for trinn
 
+**Historisk guide. Ny prosess starter med [KVOTE.md](KVOTE.md), steg 1. Ikke kjør de gamle 30/90-dagerskommandoene nedenfor nå. Pilot og fullkjøring avklares separat etter kvotesikring.**
+
 Fra GitHub-klonen: se [ALCHEMY.md](ALCHEMY.md) for nøkkeloppsett. Bruk `python3 rpc_setup.py` i Ubuntu-klonen eller lokal `.env`. ZIP-utpakking nedenfor er alternativet til Git-kloning.
 
 Dette bruker Windows med WSL2/Ubuntu for Foundry/Anvil. Python-koden har ingen tredjeparts-Python-avhengigheter. Du trenger ingen wallet eller privatnøkkel. De eneste eksterne dataene er lesetilgang til Ethereum og Norges Bank.

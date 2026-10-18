@@ -1,0 +1,26 @@
+{
+  "version": "estimated-conservative-v1",
+  "label": "ANTATT CU-satser; ikke verifisert mot aktuell Alchemy-plan",
+  "reference": "https://www.alchemy.com/docs/reference/compute-unit-costs",
+  "verified_live": false,
+  "safety_multiplier": 2,
+  "notes": "Arbeidsestimater, ikke fakturert forbruk. Alle forsøk, også feil, reserveres før nettverkskallet. Ukjente metoder blokkeres. Kontroller faktisk forbruk i Alchemy. Sikkerhetsfaktoren er ikke en garanti for faktisk kostnad.",
+  "methods": {
+    "eth_chainId": 0,
+    "net_version": 0,
+    "eth_blockNumber": 10,
+    "eth_getBlockByNumber": 16,
+    "eth_getBlockByHash": 16,
+    "eth_call": 26,
+    "eth_getLogs": 75,
+    "eth_feeHistory": 10,
+    "eth_getBlockReceipts": 500,
+    "eth_getTransactionReceipt": 15,
+    "eth_getTransactionByHash": 17,
+    "eth_getBalance": 19,
+    "eth_getCode": 19,
+    "eth_getStorageAt": 17,
+    "eth_getTransactionCount": 26,
+    "eth_getProof": 100
+  }
+}

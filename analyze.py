@@ -5,6 +5,8 @@ from market import timestamp
 
 def validate(folder):
     folder=pathlib.Path(folder);m=json.loads((folder/'manifest.json').read_text())
+    if m.get('swap_filter') or m.get('every_n_blocks',1)!=1:
+        raise ValueError('Filtered/sampled collection is not a validated full study. Step 3 reporting requires separate validation; no invented skipped-block PnL.')
     if not m['complete'] or m['status']!='COLLECTED' or m['smoke_only']:raise ValueError('Incomplete/smoke-only collection is NOT a valid backtest')
     if timestamp(m['end_exclusive'])-timestamp(m['start'])<30*86400:raise ValueError('Minimum 30 days')
     rows=[json.loads(x) for x in (folder/'blocks.jsonl').read_text().splitlines() if x.strip()]
