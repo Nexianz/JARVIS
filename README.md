@@ -44,7 +44,7 @@ Da viser nettsiden **AI + faste risikogrenser**. Modellen kan velge en av de kva
 
 ## Hva nettsiden faktisk viser
 
-- **MÅLT:** observert mainnet-blokk, ETH/USD og USDC/USD fra Chainlink, pool-quotes og Aave-premium på samme eksplisitte blokknummer. Ruter bruker USDC → WETH → USDC i ulike pooler. Swapgebyr og prisimpact er inkludert i DEX-quotes.
+- **MÅLT:** observert mainnet-blokk, ETH/USD og USDC/USD fra Chainlink, en liten DEX-quote på 0,01 WETH for prisgrafen, pool-quotes og Aave-premium på samme eksplisitte blokknummer. Ruter bruker USDC → WETH → USDC i ulike pooler. Swapgebyr og prisimpact er inkludert i DEX-quotes.
 - **BEREGNET:** prisforskjeller, forventet netto og NOK-regnskap for virtuelle handler.
 - **ANTATT:** startkapital, gassmengde, gasstilbud for neste forsøk, builder-bud, inklusjon og simulerte fills/reverteringer. En paper-fill er ikke en EVM-verifisert transaksjon eller bevist gjennomførbar arbitrase.
 
@@ -98,7 +98,7 @@ Hvis `.env` allerede finnes, åpne den; ikke overskriv den. Legg inn ny Alchemy-
 
 ## Kontrollert i leveransemiljøet
 
-- `npm test`: 24 tester for beslutninger, kostnader, risiko, API-autentisering, konkurranse, samtidighet og ekte SDK mot lokal Netlify Blobs-emulator. Marked/AI-responser i testene er eksplisitt syntetiske.
+- `npm test`: 26 tester for beslutninger, kostnader, risiko, API-autentisering, konkurranse, samtidighet og ekte SDK mot lokal Netlify Blobs-emulator. Marked/AI-responser i testene er eksplisitt syntetiske.
 - `npm run build`: publiseringsmappen sjekkes; kun statiske nettsidefiler publiseres.
 - Nettleser: desktop, mobil, eierdialog, ingen JavaScript-feil og kontroll av horisontal overflow.
 - Ingen ny Alchemy-/OpenAI-nøkkel er tilgjengelig i leveransemiljøet. Reelle Netlify Functions, planlagt cron, ekte Alchemy-quotes og OpenAI er **ikke verifisert i en publisert Netlify-instans**. Din tidligere Windows-test viste at Alchemy-arkivtilgangen fungerer, men det er en separat test.
@@ -107,3 +107,9 @@ Hvis `.env` allerede finnes, åpne den; ikke overskriv den. Legg inn ny Alchemy-
 ## Tidligere historisk forskningspakke
 
 Den ligger fortsatt i repoet, men brukes ikke av nettsiden. Se [BACKTEST.md](BACKTEST.md), [WINDOWS.md](WINDOWS.md) og [STATUS.md](STATUS.md) for det opprinnelige backtestarbeidet. Ingen historisk avkastning påstås målt der. [ALCHEMY.md](ALCHEMY.md) beskriver også den separate Python-tilkoblingstesten; for nettsiden legger du nøklene direkte i Netlify.
+
+### ETH-graf og hover
+
+ETH/USD er standardvisningen. Grafen viser kun faktisk innsamlede målinger, omtrent hvert minutt mens agenten kjører; ingen historikk fylles inn med demodata. En quote på 0,01 WETH fra Uniswap V3 0,05 % gir en oppdatert, omtrentlig DEX-pris inklusive poolgebyr/prisimpact. Chainlink brukes som tydelig merket reserve ved quote-feil, og brukes fortsatt uendret til gasskostnadsberegningen. Eldre lagrede ETH-punkter var Chainlink-observasjoner; hover viser kilden per punkt.
+
+Hover eller trykk viser pris, dato/tid, blokknummer og kilde. Piltaster/Home/End virker når grafen har tastaturfokus. X-aksen bruker reell måletid, og pauser over tre minutter og skifte av priskilde får brudd i linjen. Frontend sjekker lagrede data hvert 15. sekund; dette er ikke tick-for-tick-strømming, og pauset agent gir ingen nye punkter. Tradinggrenser og startkapital er uendret.

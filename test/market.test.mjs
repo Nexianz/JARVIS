@@ -34,7 +34,7 @@ function fixture() {
 }
 test('real scanner path uses one pinned block, 36 route/size quotes and explicit cost model', async () => {
   const { seen, fetcher } = fixture(); const m = await scanMarket({ env: { ALCHEMY_API_KEY: 'synthetic-key' }, fetcher, now });
-  assert.equal(m.candidates.length, 36); assert.equal(m.ethUsd, 3000); assert.equal(m.premiumBps, 5); assert.equal(m.fx.rate, 10.5);
+  assert.equal(m.candidates.length, 36); assert.equal(m.ethUsd, 3000); assert.ok(m.ethSpotUsd > 3000); assert.match(m.ethSpotSource, /DEX-quote/); assert.equal(m.premiumBps, 5); assert.equal(m.fx.rate, 10.5);
   assert.ok(m.candidates[0].netNok > m.candidates.at(-1).netNok);
   assert.ok(seen.filter(x => x.method === 'eth_call').every(x => x.params[1] === '0x' + block.toString(16)));
   assert.equal(m.model.gasUnits, 450000); assert.equal(m.fx.label, 'MÅLT dagskurs');

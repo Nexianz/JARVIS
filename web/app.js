@@ -1,3 +1,4 @@
+import { drawSeries, samplesFor } from './chart.js';
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2 });
 const integer = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 });
@@ -5,7 +6,7 @@ const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 const money = n => nf.format(Number(n) || 0);
 const safe = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const time = s => new Date(s).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
-let state, token = '', chartMode = 'equity', busy = false, flashMessage = '';
+let state, token = '', chartMode = 'ethUsd', busy = false, flashMessage = '';
 function alertMessage(text) { $('alert').textContent = text; $('alert').hidden = !text; }
 async function request(body) {
   const options = body ? { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) } : {};
@@ -42,16 +43,22 @@ function render() {
   const pnl = state.balance - state.startNok;
   $('pnl').textContent = `${pnl >= 0 ? '+' : ''}${money(pnl)} NOK · BEREGNET paper-PnL`;
   $('pnl').className = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : '';
-  $('eth').textContent = m ? usd.format(m.ethUsd) : '—';
+  $('eth').textContent = m ? usd.format(m.ethSpotUsd ?? m.ethUsd) : '—';
+  $('eth-source').textContent = m?.ethSpotSource ? `MÅLT · ${m.ethSpotSource}` : 'MÅLT · Chainlink-orakel';
   const best = m?.candidates[0];
   $('best').innerHTML = best ? `${money(best.netNok)} <small>NOK</small>` : '—';
   $('best').className = `metric-value ${best ? best.netNok > 0 ? 'positive' : 'negative' : ''}`;
   $('count').textContent = integer.format(c.wins + c.failed);
   $('count-note').textContent = `${c.wins} antatte fills · ${c.failed} simulerte feil`;
   $('drawdown').textContent = `Beregnet maks drawdown: ${money(state.maxDrawdown * 100)} %`;
-  $('samples').textContent = `${state.history.length} målte tidspunkter`;
+  $('samples').textContent = `${samplesFor(state.history, chartMode).length} målte tidspunkter`;
   $('block').textContent = m ? `Blokk ${integer.format(m.block)}` : 'Blokk —';
-  $('chart-value').textContent = chartMode === 'equity' ? `${money(state.balance)} NOK` : m ? usd.format(m.ethUsd) : '—';
+  $('chart-value').textContent = chartMode === 'equity' ? `${money(state.balance)} NOK` : m ? usd.format(m.ethSpotUsd ?? m.ethUsd) : '—';
+  $('chart-title').textContent = chartMode === 'equity' ? 'Kapitalens utvikling' : 'ETH / USD · prisutvikling';
+  $('chart-category').textContent = chartMode === 'equity' ? 'PAPER-PORTEFØLJE' : 'ETHEREUM MAINNET';
+  $('chart-legend').textContent = chartMode === 'equity' ? 'BEREGNET · egenkapital i NOK' : 'MÅLT · hover eller trykk for pris og kilde';
+  $('chart-cadence').textContent = state.running ? 'Nye målinger ca. hvert minutt · ikke tick-for-tick' : 'Agenten er pauset · grafen viser lagrede målinger';
+  $('drawdown').hidden = chartMode !== 'equity';
   $('channel').value = state.channel; $('channel').disabled = state.running;
   const issues = [];
   if (!state.capabilities.rpcConfigured || !state.capabilities.adminConfigured) issues.push('Oppsett mangler: eieren må legge inn Alchemy-tilgang og eierpassord i Netlify.');
@@ -70,16 +77,7 @@ function render() {
   drawChart();
 }
 function drawChart() {
-  const points = state.history.filter(p => Number.isFinite(p[chartMode]));
-  if (!points.length) return;
-  const W = 680, H = 210, L = 18, R = 22, T = 16, B = 29;
-  const values = points.map(p => p[chartMode]); const low = Math.min(...values), high = Math.max(...values);
-  const pad = Math.max((high - low) * .25, chartMode === 'equity' ? 3 : high * .001);
-  const min = low - pad, max = high + pad;
-  const xy = points.map((p, i) => [L + (W - L - R) * i / Math.max(points.length - 1, 1), T + (H - T - B) * (1 - (p[chartMode] - min) / (max - min))]);
-  const line = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
-  const last = xy.at(-1); const grid = [0, 1, 2, 3].map(i => { const y = T + (H - T - B) * i / 3; return `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#2b2e3a" stroke-dasharray="3 5"/><text x="${W - R}" y="${y - 5}" text-anchor="end" fill="#636d84" font-size="8">${safe(integer.format(max - (max - min) * i / 3))}</text>`; }).join('');
-  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${chartMode === 'equity' ? 'Simulert egenkapital basert på observerte tidspunkter' : 'Målt ETH-pris'}"><defs><linearGradient id="shade" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#b69bff" stop-opacity=".14"/><stop offset="1" stop-color="#b69bff" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${line} L${last[0]},${H - B} L${L},${H - B} Z" fill="url(#shade)"/><path d="${line}" fill="none" stroke="#bb9bf4" stroke-width="2"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="#d4baff"/><text x="${L}" y="${H - 6}" fill="#6c7690" font-size="9">${safe(time(points[0].at))}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" fill="#6c7690" font-size="9">${safe(time(points.at(-1).at))}</text></svg>`;
+  drawSeries($('chart'), { history: state.history, field: chartMode, formatValue: chartMode === 'equity' ? n => `${money(n)} NOK` : n => usd.format(n), title: chartMode === 'equity' ? 'Simulert egenkapital' : 'Målt ETH/USD' });
 }
 $('owner').addEventListener('click', () => $('owner-dialog').showModal());
 $('close-dialog').addEventListener('click', () => $('owner-dialog').close());

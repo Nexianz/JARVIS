@@ -15,7 +15,7 @@ const store = {
     fs.writeFileSync(statePath + '.tmp', JSON.stringify(data)); fs.renameSync(statePath + '.tmp', statePath); return { modified: true };
   },
 };
-const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/style.css', ['style.css', 'text/css']]]);
+const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/style.css', ['style.css', 'text/css']], ['/chart.js', ['chart.js', 'text/javascript']]]);
 const port = Number(process.env.PORT || 3000);
 const server = http.createServer(async (req, res) => {
   try {

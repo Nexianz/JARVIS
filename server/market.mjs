@@ -48,6 +48,12 @@ export async function scanMarket({ env = process.env, fetcher = fetch, now = Dat
   const usdW = await rpc.call('0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6', '0xfeaf968c', block);
   if (usdW.length < 5 || usdW[1] <= 0n || usdW[1] >= 2n ** 255n || usdW[4] < usdW[0] || now / 1000 - Number(usdW[3]) > 86400 || Number(usdW[3]) * 1000 > now) throw Error('USDC/USD-orakelet er foreldet eller ugyldig.');
   const usdcUsd = Number(usdW[1]) / 1e8;
+  let ethSpotUsd = ethUsd, ethSpotSource = 'Chainlink-orakel (DEX-quote utilgjengelig)';
+  try {
+    const out = await quote(rpc, VENUES[2], WETH, USDC, 10n ** 16n, block);
+    const price = Number(out) / 1e6 / .01 * usdcUsd;
+    if (Number.isFinite(price) && price > 0) { ethSpotUsd = price; ethSpotSource = 'DEX-quote, 0,01 WETH · inkl. poolgebyr/prisimpact'; }
+  } catch { /* Oracle fallback is explicitly labeled; trading cost valuation stays unchanged. */ }
   const providerW = await rpc.call('0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e', '0x026b1d5f', block);
   const pool = '0x' + providerW[0].toString(16).padStart(40, '0');
   const premiumBps = Number((await rpc.call(pool, '0x074b2e43', block))[0]);
@@ -74,7 +80,7 @@ export async function scanMarket({ env = process.env, fetcher = fetch, now = Dat
   }
   if (!candidates.length) throw Error('Ingen gyldige pool-quotes. Ingen paperhandel bokføres.');
   candidates.sort((a, b) => b.netNok - a.netNok);
-  return { block, blockHash: raw.hash, timestamp: new Date(timestamp).toISOString(), observedAt: new Date(now).toISOString(), ethUsd, usdcUsd, fx, premiumBps, baseGwei: Number(BigInt(raw.baseFeePerGas)) / 1e9, gasGwei: Number(gasWei) / 1e9, tipGwei: Number(tipWei) / 1e9, tipSource, candidates, unavailableVenues: [...errors], model: MODEL, rpcCalls: rpc.count };
+  return { block, blockHash: raw.hash, timestamp: new Date(timestamp).toISOString(), observedAt: new Date(now).toISOString(), ethUsd, ethSpotUsd, ethSpotSource, usdcUsd, fx, premiumBps, baseGwei: Number(BigInt(raw.baseFeePerGas)) / 1e9, gasGwei: Number(gasWei) / 1e9, tipGwei: Number(tipWei) / 1e9, tipSource, candidates, unavailableVenues: [...errors], model: MODEL, rpcCalls: rpc.count };
 }
 const factories = ['0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f', '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac', '0x1F98431c8aD98523631AE4a59f267346ea31F984', '0x1F98431c8aD98523631AE4a59f267346ea31F984'];
 const SWAP2 = '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822';

@@ -85,6 +85,6 @@ export async function advance(state, market, { now = Date.now(), compete = async
     }
   }
   state.peak = Math.max(state.peak, state.balance); state.maxDrawdown = Math.max(state.maxDrawdown, (state.peak - state.balance) / state.peak);
-  state.history = [...state.history, { at: new Date(now).toISOString(), block: market.block, equity: state.balance, ethUsd: market.ethUsd, bestNetNok: market.candidates[0]?.netNok ?? null }].slice(-1440);
+  state.history = [...state.history, { at: new Date(now).toISOString(), block: market.block, equity: state.balance, ethUsd: market.ethSpotUsd ?? market.ethUsd, ethSource: market.ethSpotSource ?? 'Chainlink-orakel', oracleEthUsd: market.ethUsd, bestNetNok: market.candidates[0]?.netNok ?? null }].slice(-1440);
   return state;
 }
